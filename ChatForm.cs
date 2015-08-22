@@ -2585,11 +2585,14 @@ namespace ChatClient
                 else
                 {
                     this.Opacity = 0;
+                    
+                    if (irc != null)
+                    {
+                        irc.Quit(mstrQuitMessage);
+                        System.Threading.Thread.Sleep(500);
 
-                    irc.Quit(mstrQuitMessage);
-                    System.Threading.Thread.Sleep(500);
-
-                    irc.Disconnect();
+                        irc.Disconnect();
+                    }
 
                     SaveSettingsBeforeClosing();
 
