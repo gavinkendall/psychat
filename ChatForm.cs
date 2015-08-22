@@ -20,7 +20,7 @@ namespace ChatClient
     public class ChatForm : System.Windows.Forms.Form
     {
         private const int CINT_DEFAULT_IRC_PORT = 6667;
-        private const string CSTR_DEFAULT_IRC_CHANNEL = "#psychat";
+        private const string CSTR_DEFAULT_IRC_CHANNEL = "##csharp";
         private const string CSTR_DEFAULT_IRC_SERVER = "irc.freenode.net";
 
         private IrcClient irc;
