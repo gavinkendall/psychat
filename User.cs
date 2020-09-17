@@ -1,46 +1,57 @@
 using System;
 using System.IO;
 using System.Drawing;
-using System.Collections;
 
-using PsyRC;
-using PsyRC.Delegates;
-
-namespace ChatClient
+namespace psychat
 {
-	public class User
-	{
-		public static string username;
-		public static string password;
-		public static string extra;
-		public static string server;
-		public static string ip;
-		public static int port;
-		public static string channel;
-		public static bool allowInput = false;
+    public static class User
+    {
+        public static string Username { get; set; }
 
-		public static string defaultFontFamily = "Verdana";
-		public static float defaultFontSize = 9;
-		public static FontStyle defaultFontStyle = FontStyle.Regular;
+        public static string Extra { get; set; }
 
-		public static Color background;
-		public static Color text;
-		public static Color yourself;
-		public static Color person;
-		public static Color action;
-		public static Color time;
-		public static Color notice;
-		public static Color tag;
+        public static string Server { get; set; }
 
-        public static void Log(string filename, string text)
+        public static int Port { get; set; }
+
+        public static string Channel { get; set; }
+
+        public static string DefaultFontFamily { get; set; } = "Verdana";
+
+        public static float DefaultFontSize { get; set; } = 9;
+
+        public static FontStyle DefaultFontStyle { get; set; } = FontStyle.Regular;
+
+        public static Color Background { get; set; }
+
+        public static Color Text { get; set; }
+
+        public static Color Yourself { get; set; }
+
+        public static Color Person { get; set; }
+
+        public static Color Action1 { get; set; }
+
+        public static Color Time { get; set; }
+
+        public static Color Notice { get; set; }
+
+        public static Color Tag { get; set; }
+
+        /// <summary>
+        /// Writes a message to the log file.
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <param name="message"></param>
+        public static void Log(string filename, string message)
         {
             try
             {
-                text = text.TrimEnd('\n');
+                message = message.TrimEnd('\n');
 
-                using (StreamWriter sw = new StreamWriter("log_" + filename + "_" + DateTime.Now.ToShortDateString().ToString().Replace("/", "-") + ".txt", true))
+                using (var sw = new StreamWriter("log_" + filename + "_" + DateTime.Now.ToString("yyyy-MM-dd") + ".txt", true))
                 {
-                    sw.WriteLine(text);
+                    sw.WriteLine(message);
                     sw.Flush();
                     sw.Close();
                 }
@@ -51,15 +62,20 @@ namespace ChatClient
             }
         }
 
-		public static void ErrorLog(string text)
-		{
-            text = text.TrimEnd('\n');
-            using (StreamWriter sw = new StreamWriter("error.txt", true))
+        /// <summary>
+        /// Writes a message to the error log.
+        /// </summary>
+        /// <param name="message">The message to write to the error log.</param>
+        public static void ErrorLog(string message)
+        {
+            message = message.TrimEnd('\n');
+
+            using (var sw = new StreamWriter("error.txt", true))
             {
-                sw.WriteLine(text);
+                sw.WriteLine(message);
                 sw.Flush();
                 sw.Close();
             }
-		}
-	}
+        }
+    }
 }

@@ -1,12 +1,9 @@
-﻿using System;
-using System.Text;
-
-namespace ChatClient
+﻿namespace psychat
 {
-    public class Application
+    public static class Application
     {
-        public static string Name = "PsyChat";
-        public static string Version = "1.0.0";
-        public static string Author = "Gavin Kendall";
+        public static readonly string Name = "PsyChat";
+        public static readonly string Version = "1.0.0.1";
+        public static readonly string Author = "Gavin Kendall";
     }
 }

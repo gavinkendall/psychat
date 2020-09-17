@@ -1,27 +1,24 @@
 using System;
-using System.IO;
-using System.Text;
-using System.Drawing;
-using System.Threading;
 using System.Collections;
-using System.Windows.Forms;
 using System.ComponentModel;
-using System.Xml.Serialization;
-using System.Runtime.Serialization;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization.Formatters.Soap;
-using System.Runtime.Serialization.Formatters.Binary;
-
+using System.Security.Principal;
+using System.Threading;
+using System.Windows.Forms;
+using Khendys.Controls;
+using Microsoft.Win32;
 using PsyRC;
-using PsyRC.Delegates;
 
-namespace ChatClient
+namespace psychat
 {
-    public class ChatForm : System.Windows.Forms.Form
+    public class ChatForm : Form
     {
         private const int CINT_DEFAULT_IRC_PORT = 6667;
-        private const string CSTR_DEFAULT_IRC_CHANNEL = "##csharp";
-        private const string CSTR_DEFAULT_IRC_SERVER = "irc.freenode.net";
+        private const string CSTR_DEFAULT_IRC_CHANNEL = "#dev";
+        private const string CSTR_DEFAULT_IRC_SERVER = "localhost";
 
         private IrcClient irc;
         private string mstrUrl;
@@ -47,13 +44,13 @@ namespace ChatClient
         private delegate void OnQueryMessage_Delegate(Data ircdata);
         private OnQueryMessage_Delegate onQueryMessageDelegate;
 
-        private bool allowInput = false;
-        private System.Windows.Forms.TabControl tabControlChatTabs;
-        private System.Windows.Forms.TabPage tabPageChatOutput;
-        private System.Windows.Forms.Panel panelUserList;
-        private System.Windows.Forms.Panel panelChatInput;
-        private System.Windows.Forms.Panel panelChatTabs;
-        private System.Windows.Forms.ListBox listBoxUserList;
+        private bool allowInput;
+        private TabControl tabControlChatTabs;
+        private TabPage tabPageChatOutput;
+        private Panel panelUserList;
+        private Panel panelChatInput;
+        private Panel panelChatTabs;
+        private ListBox listBoxUserList;
         private PsyTextBox.PsyTextBox textBoxChatInput;
 
         private TabPage tab;
@@ -64,11 +61,11 @@ namespace ChatClient
         private ArrayList alPrivMsgWindowList = new ArrayList();
 
         private Thread threadIrcConnection;
-        private Khendys.Controls.ExRichTextBox textBoxChatWindow;
+        private ExRichTextBox textBoxChatWindow;
 
         private System.Timers.Timer timerAutoScroll;
-        private Khendys.Controls.ExRichTextBox exRichTextBoxChatOutput;
-        private System.ComponentModel.IContainer components;
+        private ExRichTextBox exRichTextBoxChatOutput;
+        private IContainer components;
 
         private MainMenu mainMenu;
         private MenuItem menuItemFile;
@@ -92,39 +89,37 @@ namespace ChatClient
         {
             try
             {
-                Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser;
+                RegistryKey key = Registry.CurrentUser;
                 key = key.CreateSubKey("SOFTWARE\\" + Application.Name);
 
                 // This works in Windows.
-                //User.username = (string)key.GetValue("username", System.Security.Principal.WindowsIdentity.GetCurrent().Name.Split('\\')[1].ToString());
+                User.Username = (string)key.GetValue("username", WindowsIdentity.GetCurrent().Name.Split('\\')[1]);
 
                 // This works in Linux.
-                User.username = (string)key.GetValue("username", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
+                //User.Username = (string)key.GetValue("username", System.Security.Principal.WindowsIdentity.GetCurrent().Name);
 
-                User.defaultFontSize = (int)key.GetValue("fontsize", 9);
+                User.DefaultFontSize = (int)key.GetValue("fontsize", 9);
                 string fontstyle = (string)key.GetValue("fontstyle", "regular");
 
                 if (fontstyle.Equals("bold"))
                 {
-                    User.defaultFontStyle = FontStyle.Bold;
+                    User.DefaultFontStyle = FontStyle.Bold;
                 }
                 if (fontstyle.Equals("regular"))
                 {
-                    User.defaultFontStyle = FontStyle.Regular;
+                    User.DefaultFontStyle = FontStyle.Regular;
                 }
 
                 InitializeComponent();
 
-                User.defaultFontFamily = (string)key.GetValue("fontfamily", "Verdana");
+                User.DefaultFontFamily = (string)key.GetValue("fontfamily", "Verdana");
 
-                User.server = (string)key.GetValue("server", CSTR_DEFAULT_IRC_SERVER);
-                User.channel = (string)key.GetValue("channel", CSTR_DEFAULT_IRC_CHANNEL);
-                User.port = (int)key.GetValue("port", CINT_DEFAULT_IRC_PORT);
+                User.Server = (string)key.GetValue("server", CSTR_DEFAULT_IRC_SERVER);
+                User.Channel = (string)key.GetValue("channel", CSTR_DEFAULT_IRC_CHANNEL);
+                User.Port = (int)key.GetValue("port", CINT_DEFAULT_IRC_PORT);
 
                 int autoconnect = (int)key.GetValue("autoconnect", 0);
                 int autoscroll = (int)key.GetValue("autoscroll", 1);
-                int swearfilter = (int)key.GetValue("swearfilter", 1);
-                int securetext = (int)key.GetValue("securetext", 0);
 
                 mstrQuitMessage = (string)key.GetValue("quitmsg", "bye");
 
@@ -152,40 +147,40 @@ namespace ChatClient
             }
         }
 
-        private void ChatForm_Load(object sender, System.EventArgs e)
+        private void ChatForm_Load(object sender, EventArgs e)
         {
             try
             {
-                User.background = Color.FromArgb(255, 255, 255);
-                User.text = Color.FromArgb(0, 0, 0);
-                User.yourself = Color.FromArgb(0, 0, 0);
-                User.person = Color.FromArgb(85, 85, 85);
-                User.action = Color.FromArgb(0, 0, 255);
-                User.notice = Color.FromArgb(0, 85, 0);
-                User.tag = Color.FromArgb(255, 0, 0);
-                User.time = Color.FromArgb(140, 137, 137);
+                User.Background = Color.FromArgb(255, 255, 255);
+                User.Text = Color.FromArgb(0, 0, 0);
+                User.Yourself = Color.FromArgb(0, 0, 0);
+                User.Person = Color.FromArgb(85, 85, 85);
+                User.Action1 = Color.FromArgb(0, 0, 255);
+                User.Notice = Color.FromArgb(0, 85, 0);
+                User.Tag = Color.FromArgb(255, 0, 0);
+                User.Time = Color.FromArgb(140, 137, 137);
 
-                tabPageChatOutput.Text = User.channel;
+                tabPageChatOutput.Text = User.Channel;
                 textBoxChatInput.Focus();
 
-                this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + User.username + "]";
-                this.panelUserList.BackColor = SystemColors.Control;
+                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Username + "]";
+                panelUserList.BackColor = SystemColors.Control;
 
-                this.exRichTextBoxChatOutput.BackColor = User.background;
-                this.exRichTextBoxChatOutput.ForeColor = User.text;
+                exRichTextBoxChatOutput.BackColor = User.Background;
+                exRichTextBoxChatOutput.ForeColor = User.Text;
 
-                AppendText(User.channel, "notice", Application.Name + " " + Application.Version + " by " + Application.Author + "\n\n");
-                AppendText(User.channel, "notice", "User: " + User.username + "\n");
-                AppendText(User.channel, "notice", "Server: " + User.server + "\n");
-                AppendText(User.channel, "notice", "Port: " + User.port.ToString() + "\n");
-                AppendText(User.channel, "notice", "Channel: " + User.channel + "\n\n");
-                AppendText(User.channel, "notice", "Enter /connect to initiate a new connection with the above user, server, port, and channel.\n\n");
-                AppendText(User.channel, "notice", "Use /nick to change your username/nickname.\n");
-                AppendText(User.channel, "notice", "Use /server to change the server.\n");
-                AppendText(User.channel, "notice", "Use /port to change the port number.\n");
-                AppendText(User.channel, "notice", "Use /channel to change the channel.\n\n");
-                AppendText(User.channel, "notice", "Enter /help for a list of available commands.\n");
-                AppendText(User.channel, "notice", "-------------------------------------" + "\n");
+                AppendText(User.Channel, "notice", Application.Name + " " + Application.Version + " by " + Application.Author + "\n\n");
+                AppendText(User.Channel, "notice", "User: " + User.Username + "\n");
+                AppendText(User.Channel, "notice", "Server: " + User.Server + "\n");
+                AppendText(User.Channel, "notice", "Port: " + User.Port + "\n");
+                AppendText(User.Channel, "notice", "Channel: " + User.Channel + "\n\n");
+                AppendText(User.Channel, "notice", "Enter /connect to initiate a new connection with the above user, server, port, and channel.\n\n");
+                AppendText(User.Channel, "notice", "Use /nick to change your username/nickname.\n");
+                AppendText(User.Channel, "notice", "Use /server to change the server.\n");
+                AppendText(User.Channel, "notice", "Use /port to change the port number.\n");
+                AppendText(User.Channel, "notice", "Use /channel to change the channel.\n\n");
+                AppendText(User.Channel, "notice", "Enter /help for a list of available commands.\n");
+                AppendText(User.Channel, "notice", "-------------------------------------" + "\n");
 
                 if (menuItemAutoConnect.Checked)
                 {
@@ -454,7 +449,7 @@ namespace ChatClient
             {
                 if (!string.IsNullOrEmpty(nickname))
                 {
-                    ChannelUser user = irc.GetChannelUser(User.channel, nickname);
+                    ChannelUser user = irc.GetChannelUser(User.Channel, nickname);
 
                     if (user.IsOp)
                     {
@@ -479,10 +474,8 @@ namespace ChatClient
 
                     return nickname;
                 }
-                else
-                {
-                    return User.username;
-                }
+
+                return User.Username;
             }
             catch (Exception ex)
             {
@@ -521,27 +514,27 @@ namespace ChatClient
         {
             try
             {
-                if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.channel, ircdata.Nick).Host))
+                if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, ircdata.Nick).Host))
                 {
-                    if (listBoxUserList.Items.Contains(Nickname(ircdata.Nick.ToString())))
+                    if (listBoxUserList.Items.Contains(Nickname(ircdata.Nick)))
                     {
                         tab = new TabPage(ircdata.Nick);
 
-                        if (!alprivMsgs.Contains(ircdata.Nick.ToString()))
+                        if (!alprivMsgs.Contains(ircdata.Nick))
                         {
-                            textBoxChatWindow = new Khendys.Controls.ExRichTextBox();
+                            textBoxChatWindow = new ExRichTextBox();
 
-                            textBoxChatWindow.BackColor = User.background;
-                            textBoxChatWindow.ForeColor = User.text;
+                            textBoxChatWindow.BackColor = User.Background;
+                            textBoxChatWindow.ForeColor = User.Text;
                             textBoxChatWindow.ReadOnly = true;
-                            textBoxChatWindow.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
+                            textBoxChatWindow.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
 
-                            textBoxChatWindow.Dock = System.Windows.Forms.DockStyle.Fill;
+                            textBoxChatWindow.Dock = DockStyle.Fill;
                             textBoxChatWindow.Visible = true;
                             
                             tab.Controls.Add(textBoxChatWindow);
 
-                            alprivMsgs.Add(ircdata.Nick.ToString());
+                            alprivMsgs.Add(ircdata.Nick);
 
                             alPrivMsgWindows = new ArrayList();
                             alPrivMsgWindows.Add(textBoxChatWindow);
@@ -550,15 +543,15 @@ namespace ChatClient
 
                             string nickname = ircdata.Nick;
                             AppendText(tab.Text, "tag", "[");
-                            AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                            AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
                             AppendText(tab.Text, "tag", "] ");
                             AppendText(tab.Text, "notice", " -!- " + nickname + " is " +
-                                irc.GetChannelUser(User.channel, nickname).Ident.ToString() + "@" +
-                                irc.GetChannelUser(User.channel, nickname).Host.ToString() + " (" +
-                                irc.GetChannelUser(User.channel, nickname).Realname.ToString() + ")\n");
+                                irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
+                                irc.GetChannelUser(User.Channel, nickname).Host + " (" +
+                                irc.GetChannelUser(User.Channel, nickname).Realname + ")\n");
 
-                            addTabPageDelegate = new AddTabPage_Delegate(AddTabPage_DelegateFunction);
-                            IAsyncResult r = BeginInvoke(addTabPageDelegate, new object[] { tab });
+                            addTabPageDelegate = AddTabPage_DelegateFunction;
+                            IAsyncResult r = BeginInvoke(addTabPageDelegate, tab);
                             EndInvoke(r);
 
                             OnQueryMessage_DelegateFunction(ircdata);
@@ -567,16 +560,16 @@ namespace ChatClient
                         {
                             for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                             {
-                                if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(ircdata.Nick.ToString()))
+                                if (tabControlChatTabs.TabPages[i].Text.Equals(ircdata.Nick))
                                 {
                                     tab = tabControlChatTabs.TabPages[i];
                                     AppendText(tab.Text, "tag", "[");
-                                    AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tab.Text, "tag", "] ");
-                                    AppendText(tab.Text, "action", "* " + ircdata.Nick.ToString() + " ");
+                                    AppendText(tab.Text, "action", "* " + ircdata.Nick + " ");
                                     AppendText(tab.Text, "action", text);
                                     AppendText(tab.Text, "text", "\n");
-                                    User.Log(tab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + "* " + ircdata.Nick.ToString() + " \n");
+                                    User.Log(tab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + "* " + ircdata.Nick + " \n");
 
                                     alPrivMsgAlert.Add(i);
                                 }
@@ -589,12 +582,12 @@ namespace ChatClient
                                 if (tab.Controls[i].GetType().Name == "ExRichTextBox")
                                 {
                                     AppendText(tab.Controls[i].Text, "tag", "[");
-                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tab.Controls[i].Text, "tag", "] ");
-                                    AppendText(tab.Controls[i].Text, "action", "* " + ircdata.Nick.ToString() + " ");
+                                    AppendText(tab.Controls[i].Text, "action", "* " + ircdata.Nick + " ");
                                     AppendText(tab.Text, "action", text);
                                     AppendText(tab.Controls[i].Text, "text", "\n");
-                                    User.Log(tab.Controls[i].Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + "* " + ircdata.Nick.ToString() + " \n");
+                                    User.Log(tab.Controls[i].Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + "* " + ircdata.Nick + " \n");
                                 }
                             }
                         }
@@ -613,26 +606,26 @@ namespace ChatClient
         {
             try
             {
-                if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.channel, ircdata.Nick).Host))
+                if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, ircdata.Nick).Host))
                 {
-                    if (listBoxUserList.Items.Contains(Nickname(ircdata.Nick.ToString())))
+                    if (listBoxUserList.Items.Contains(Nickname(ircdata.Nick)))
                     {
                         tab = new TabPage(ircdata.Nick);
 
-                        if (!alprivMsgs.Contains(ircdata.Nick.ToString()))
+                        if (!alprivMsgs.Contains(ircdata.Nick))
                         {
-                            textBoxChatWindow = new Khendys.Controls.ExRichTextBox();
-                            textBoxChatWindow.BackColor = User.background;
-                            textBoxChatWindow.ForeColor = User.text;
+                            textBoxChatWindow = new ExRichTextBox();
+                            textBoxChatWindow.BackColor = User.Background;
+                            textBoxChatWindow.ForeColor = User.Text;
                             textBoxChatWindow.ReadOnly = true;
-                            textBoxChatWindow.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
-                            textBoxChatWindow.Dock = System.Windows.Forms.DockStyle.Fill;
+                            textBoxChatWindow.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
+                            textBoxChatWindow.Dock = DockStyle.Fill;
                             textBoxChatWindow.Visible = true;
                             
                             tab.Controls.Add(textBoxChatWindow);
 
 
-                            alprivMsgs.Add(ircdata.Nick.ToString());
+                            alprivMsgs.Add(ircdata.Nick);
 
                             alPrivMsgWindows = new ArrayList();
                             alPrivMsgWindows.Add(textBoxChatWindow);
@@ -641,15 +634,15 @@ namespace ChatClient
 
                             string nickname = ircdata.Nick;
                             AppendText(tab.Text, "tag", "[");
-                            AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                            AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
                             AppendText(tab.Text, "tag", "] ");
                             AppendText(tab.Text, "notice", " -!- " + nickname + " is " +
-                                irc.GetChannelUser(User.channel, nickname).Ident.ToString() + "@" +
-                                irc.GetChannelUser(User.channel, nickname).Host.ToString() + " (" +
-                                irc.GetChannelUser(User.channel, nickname).Realname.ToString() + ")\n");
+                                irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
+                                irc.GetChannelUser(User.Channel, nickname).Host + " (" +
+                                irc.GetChannelUser(User.Channel, nickname).Realname + ")\n");
 
-                            addTabPageDelegate = new AddTabPage_Delegate(AddTabPage_DelegateFunction);
-                            IAsyncResult r = BeginInvoke(addTabPageDelegate, new object[] { tab });
+                            addTabPageDelegate = AddTabPage_DelegateFunction;
+                            IAsyncResult r = BeginInvoke(addTabPageDelegate, tab);
                             EndInvoke(r);
 
                             OnQueryMessage_DelegateFunction(ircdata);
@@ -658,17 +651,17 @@ namespace ChatClient
                         {
                             for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                             {
-                                if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(ircdata.Nick.ToString()))
+                                if (tabControlChatTabs.TabPages[i].Text.Equals(ircdata.Nick))
                                 {
                                     tab = tabControlChatTabs.TabPages[i];
                                     AppendText(tab.Text, "tag", "[");
-                                    AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tab.Text, "tag", "] <");
-                                    AppendText(tab.Text, "person", Nickname(ircdata.Nick.ToString()));
+                                    AppendText(tab.Text, "person", Nickname(ircdata.Nick));
                                     AppendText(tab.Text, "tag", "> ");
-                                    AppendText(tab.Text, "person", ircdata.Message.ToString());
+                                    AppendText(tab.Text, "person", ircdata.Message);
                                     AppendText(tab.Text, "text", "\n");
-                                    User.Log(tab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] <" + ircdata.Nick.ToString() + "> " + ircdata.Message.ToString() + "\n");
+                                    User.Log(tab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
 
                                     alPrivMsgAlert.Add(i);
                                 }
@@ -681,13 +674,13 @@ namespace ChatClient
                                 if (tab.Controls[i].GetType().Name == "ExRichTextBox")
                                 {
                                     AppendText(tab.Controls[i].Text, "tag", "[");
-                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tab.Controls[i].Text, "tag", "] <");
-                                    AppendText(tab.Controls[i].Text, "person", ircdata.Nick.ToString());
+                                    AppendText(tab.Controls[i].Text, "person", ircdata.Nick);
                                     AppendText(tab.Controls[i].Text, "tag", "> ");
-                                    AppendText(tab.Controls[i].Text, "person", ircdata.Message.ToString());
+                                    AppendText(tab.Controls[i].Text, "person", ircdata.Message);
                                     AppendText(tab.Controls[i].Text, "text", "\n");
-                                    User.Log(tab.Controls[i].Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] <" + ircdata.Nick.ToString() + "> " + ircdata.Message.ToString() + "\n");
+                                    User.Log(tab.Controls[i].Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
                                 }
                             }
                         }
@@ -708,35 +701,35 @@ namespace ChatClient
             {
                 if (str3 != null)
                 {
-                    AppendText(User.channel, "tag", "[");
-                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                    AppendText(User.channel, "tag", "] ");
-                    AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1.ToString() + " (" + str3.ToString() + ")" + "\n");
-                    User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1.ToString() + " (" + str3.ToString() + ")" + "\n");
+                    AppendText(User.Channel, "tag", "[");
+                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "tag", "] ");
+                    AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + " (" + str3 + ")" + "\n");
+                    User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + " (" + str3 + ")" + "\n");
                 }
                 else
                 {
-                    AppendText(User.channel, "tag", "[");
-                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                    AppendText(User.channel, "tag", "] ");
-                    AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1.ToString() + "\n");
-                    User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1.ToString() + "\n");
+                    AppendText(User.Channel, "tag", "[");
+                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "tag", "] ");
+                    AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + "\n");
+                    User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + "\n");
                 }
 
-                if (alprivMsgs.Contains(ircdata.Nick.ToString()))
+                if (alprivMsgs.Contains(ircdata.Nick))
                 {
                     for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                     {
-                        if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(ircdata.Nick.ToString()))
+                        if (tabControlChatTabs.TabPages[i].Text.Equals(ircdata.Nick))
                         {
-                            removeTabPageDelegate = new RemoveTabPage_Delegate(RemoveTabPage_DelegateFunction);
-                            IAsyncResult r = BeginInvoke(removeTabPageDelegate, new object[] { tabControlChatTabs.TabPages[i] });
+                            removeTabPageDelegate = RemoveTabPage_DelegateFunction;
+                            IAsyncResult r = BeginInvoke(removeTabPageDelegate, tabControlChatTabs.TabPages[i]);
                             EndInvoke(r);
                         }
                     }
                 }
 
-                RemoveUserFromUserList(ircdata.Nick.ToString());
+                RemoveUserFromUserList(ircdata.Nick);
             }
             catch (Exception ex)
             {
@@ -750,35 +743,35 @@ namespace ChatClient
             {
                 if (str2 != null)
                 {
-                    AppendText(User.channel, "tag", "[");
-                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                    AppendText(User.channel, "tag", "] ");
-                    AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit" + " (" + str2.ToString() + ")" + "\n");
-                    User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit" + " (" + str2.ToString() + ")" + "\n");
+                    AppendText(User.Channel, "tag", "[");
+                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "tag", "] ");
+                    AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit" + " (" + str2 + ")" + "\n");
+                    User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit" + " (" + str2 + ")" + "\n");
                 }
                 else
                 {
-                    AppendText(User.channel, "tag", "[");
-                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                    AppendText(User.channel, "tag", "] ");
-                    AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit\n");
-                    User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit\n");
+                    AppendText(User.Channel, "tag", "[");
+                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "tag", "] ");
+                    AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit\n");
+                    User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit\n");
                 }
 
-                if (alprivMsgs.Contains(ircdata.Nick.ToString()))
+                if (alprivMsgs.Contains(ircdata.Nick))
                 {
                     for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                     {
-                        if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(ircdata.Nick.ToString()))
+                        if (tabControlChatTabs.TabPages[i].Text.Equals(ircdata.Nick))
                         {
-                            removeTabPageDelegate = new RemoveTabPage_Delegate(RemoveTabPage_DelegateFunction);
-                            IAsyncResult r = BeginInvoke(removeTabPageDelegate, new object[] { tabControlChatTabs.TabPages[i] });
+                            removeTabPageDelegate = RemoveTabPage_DelegateFunction;
+                            IAsyncResult r = BeginInvoke(removeTabPageDelegate, tabControlChatTabs.TabPages[i]);
                             EndInvoke(r);
                         }
                     }
                 }
 
-                RemoveUserFromUserList(ircdata.Nick.ToString());
+                RemoveUserFromUserList(ircdata.Nick);
             }
             catch (Exception ex)
             {
@@ -790,47 +783,47 @@ namespace ChatClient
         {
             try
             {
-                if (!ircdata.Nick.ToString().Equals(irc.Nickname.ToString()))
+                if (!ircdata.Nick.Equals(irc.Nickname))
                 {
-                    AppendText(User.channel, "tag", "[");
-                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                    AppendText(User.channel, "tag", "] ");
-                    AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident.ToString() + "@" + ircdata.Host.ToString() + "] has joined " + str1.ToString() + "\n");
-                    User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " [" + ircdata.Ident.ToString() + "@" + ircdata.Host.ToString() + "] has joined " + str1.ToString() + "\n");
+                    AppendText(User.Channel, "tag", "[");
+                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "tag", "] ");
+                    AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
+                    User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
                 }
                 else
                 {
                     if (mblnShowWelcomeMessage)
                     {
-                        AppendText(User.channel, "notice", "-------------------------------------" + "\n");
-                        AppendText(User.channel, "notice", " -!- You're in! You can start chatting now. ");
-                        AppendText(User.channel, "text", "\n");
+                        AppendText(User.Channel, "notice", "-------------------------------------" + "\n");
+                        AppendText(User.Channel, "notice", " -!- You're in! You can start chatting now. ");
+                        AppendText(User.Channel, "text", "\n");
 
-                        AppendText(User.channel, "notice", " -!- You may want to change your default nickname.");
-                        AppendText(User.channel, "text", "\n");
+                        AppendText(User.Channel, "notice", " -!- You may want to change your default nickname.");
+                        AppendText(User.Channel, "text", "\n");
 
-                        AppendText(User.channel, "notice", " -!- Enter \"/nick random12345\" (without quotes) to change your nickname to random12345.");
-                        AppendText(User.channel, "text", "\n");
+                        AppendText(User.Channel, "notice", " -!- Enter \"/nick random12345\" (without quotes) to change your nickname to random12345.");
+                        AppendText(User.Channel, "text", "\n");
 
                         mblnShowWelcomeMessage = false;
                     }
 
-                    AppendText(User.channel, "tag", "[");
-                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                    AppendText(User.channel, "tag", "] ");
-                    AppendText(User.channel, "notice", " -!- " + irc.Nickname.ToString() + " [" + ircdata.Ident.ToString() + "@" + ircdata.Host.ToString() + "] has joined " + str1.ToString() + "\n");
+                    AppendText(User.Channel, "tag", "[");
+                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "tag", "] ");
+                    AppendText(User.Channel, "notice", " -!- " + irc.Nickname + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
 
-                    User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + irc.Nickname.ToString() + " [" + ircdata.Ident.ToString() + "@" + ircdata.Host.ToString() + "] has joined " + str1.ToString() + "\n");
+                    User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + irc.Nickname + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
                     allowInput = true;
                 }
 
-                if (!ircdata.Nick.ToString().Equals(irc.Nickname.ToString()))
+                if (!ircdata.Nick.Equals(irc.Nickname))
                 {
-                    AddUserToUserList(ircdata.Nick.ToString());
+                    AddUserToUserList(ircdata.Nick);
                 }
                 else
                 {
-                    AddUserToUserList(irc.Nickname.ToString());
+                    AddUserToUserList(irc.Nickname);
                 }
             }
             catch (Exception ex)
@@ -843,19 +836,19 @@ namespace ChatClient
         {
             try
             {
-                if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.channel, ircdata.Nick).Host))
+                if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, ircdata.Nick).Host))
                 {
                     for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                     {
-                        if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(User.channel))
+                        if (tabControlChatTabs.TabPages[i].Text.Equals(User.Channel))
                         {
-                            AppendText(User.channel, "tag", "[");
-                            AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                            AppendText(User.channel, "tag", "] ");
-                            AppendText(User.channel, "action", "* " + ircdata.Nick.ToString() + " ");
-                            AppendText(User.channel, "action", text);
-                            AppendText(User.channel, "text", "\n");
-                            User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + "* " + ircdata.Nick.ToString() + " " + text + "\n");
+                            AppendText(User.Channel, "tag", "[");
+                            AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                            AppendText(User.Channel, "tag", "] ");
+                            AppendText(User.Channel, "action", "* " + ircdata.Nick + " ");
+                            AppendText(User.Channel, "action", text);
+                            AppendText(User.Channel, "text", "\n");
+                            User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + "* " + ircdata.Nick + " " + text + "\n");
 
                             alPrivMsgAlert.Add(i);
                             break;
@@ -875,14 +868,14 @@ namespace ChatClient
         {
             try
             {
-                this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + irc.Nickname + "] - " + irc.GetChannel(User.channel).Topic.ToString();
+                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + irc.GetChannel(User.Channel).Topic;
 
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + str1.ToString() + " is now known as " + str2.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + str1 + " is now known as " + str2 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + str1.ToString() + " is now known as " + str2.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + str1 + " is now known as " + str2 + "\n");
 
                 for (int i = 0; i < alprivMsgs.Count; i++)
                 {
@@ -894,7 +887,7 @@ namespace ChatClient
 
                 for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                 {
-                    if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(str1))
+                    if (tabControlChatTabs.TabPages[i].Text.Equals(str1))
                     {
                         tabControlChatTabs.TabPages[i].Text = str2;
                     }
@@ -913,7 +906,7 @@ namespace ChatClient
         {
             try
             {
-                Channel chan = irc.GetChannel(User.channel);
+                Channel chan = irc.GetChannel(User.Channel);
                 IDictionaryEnumerator it = chan.Users.GetEnumerator();
 
                 while (it.MoveNext())
@@ -924,44 +917,44 @@ namespace ChatClient
                     {
                         if (chanUser.IsOwner)
                         {
-                            if (!listBoxUserList.Items.Contains("~" + chanUser.Nick.ToString()))
+                            if (!listBoxUserList.Items.Contains("~" + chanUser.Nick))
                             {
-                                listBoxUserList.Items.Add("~" + chanUser.Nick.ToString());
+                                listBoxUserList.Items.Add("~" + chanUser.Nick);
                             }
                         }
                         else if (chanUser.IsOp)
                         {
-                            if (!listBoxUserList.Items.Contains("@" + chanUser.Nick.ToString()))
+                            if (!listBoxUserList.Items.Contains("@" + chanUser.Nick))
                             {
-                                listBoxUserList.Items.Add("@" + chanUser.Nick.ToString());
+                                listBoxUserList.Items.Add("@" + chanUser.Nick);
                             }
                         }
                         else if (chanUser.IsHalfOp)
                         {
-                            if (!listBoxUserList.Items.Contains("%" + chanUser.Nick.ToString()))
+                            if (!listBoxUserList.Items.Contains("%" + chanUser.Nick))
                             {
-                                listBoxUserList.Items.Add("%" + chanUser.Nick.ToString());
+                                listBoxUserList.Items.Add("%" + chanUser.Nick);
                             }
                         }
                         else if (chanUser.IsVoice)
                         {
-                            if (!listBoxUserList.Items.Contains("+" + chanUser.Nick.ToString()))
+                            if (!listBoxUserList.Items.Contains("+" + chanUser.Nick))
                             {
-                                listBoxUserList.Items.Add("+" + chanUser.Nick.ToString());
+                                listBoxUserList.Items.Add("+" + chanUser.Nick);
                             }
                         }
                         else if (chanUser.IsProtected)
                         {
-                            if (!listBoxUserList.Items.Contains("&" + chanUser.Nick.ToString()))
+                            if (!listBoxUserList.Items.Contains("&" + chanUser.Nick))
                             {
-                                listBoxUserList.Items.Add("&" + chanUser.Nick.ToString());
+                                listBoxUserList.Items.Add("&" + chanUser.Nick);
                             }
                         }
                         else if (!chanUser.IsOp && !chanUser.IsVoice && !chanUser.IsHalfOp && !chanUser.IsOwner && !chanUser.IsProtected)
                         {
-                            if (!listBoxUserList.Items.Contains(chanUser.Nick.ToString()))
+                            if (!listBoxUserList.Items.Contains(chanUser.Nick))
                             {
-                                listBoxUserList.Items.Add(chanUser.Nick.ToString());
+                                listBoxUserList.Items.Add(chanUser.Nick);
                             }
                         }
                     }
@@ -977,34 +970,34 @@ namespace ChatClient
         {
             try
             {
-                if (listBoxUserList.Items.Contains("~" + nickname.ToString()))
+                if (listBoxUserList.Items.Contains("~" + nickname))
                 {
-                    listBoxUserList.Items.Remove("~" + nickname.ToString());
+                    listBoxUserList.Items.Remove("~" + nickname);
                 }
 
-                if (listBoxUserList.Items.Contains("@" + nickname.ToString()))
+                if (listBoxUserList.Items.Contains("@" + nickname))
                 {
-                    listBoxUserList.Items.Remove("@" + nickname.ToString());
+                    listBoxUserList.Items.Remove("@" + nickname);
                 }
 
-                if (listBoxUserList.Items.Contains("%" + nickname.ToString()))
+                if (listBoxUserList.Items.Contains("%" + nickname))
                 {
-                    listBoxUserList.Items.Remove("%" + nickname.ToString());
+                    listBoxUserList.Items.Remove("%" + nickname);
                 }
 
-                if (listBoxUserList.Items.Contains("+" + nickname.ToString()))
+                if (listBoxUserList.Items.Contains("+" + nickname))
                 {
-                    listBoxUserList.Items.Remove("+" + nickname.ToString());
+                    listBoxUserList.Items.Remove("+" + nickname);
                 }
 
-                if (listBoxUserList.Items.Contains("&" + nickname.ToString()))
+                if (listBoxUserList.Items.Contains("&" + nickname))
                 {
-                    listBoxUserList.Items.Remove("&" + nickname.ToString());
+                    listBoxUserList.Items.Remove("&" + nickname);
                 }
 
-                if (listBoxUserList.Items.Contains(nickname.ToString()))
+                if (listBoxUserList.Items.Contains(nickname))
                 {
-                    listBoxUserList.Items.Remove(nickname.ToString());
+                    listBoxUserList.Items.Remove(nickname);
                 }
             }
             catch (Exception ex)
@@ -1019,7 +1012,7 @@ namespace ChatClient
             {
                 if (listBoxUserList.InvokeRequired)
                 {
-                    listBoxUserList.Invoke(new UpdateUserList_Delegate(UpdateUserList), new object[] { clear });
+                    listBoxUserList.Invoke(new UpdateUserList_Delegate(UpdateUserList), clear);
                 }
                 else
                 {
@@ -1028,7 +1021,7 @@ namespace ChatClient
                         listBoxUserList.Items.Clear();
                     }
 
-                    Channel chan = irc.GetChannel(User.channel);
+                    Channel chan = irc.GetChannel(User.Channel);
 
                     if (chan != null)
                     {
@@ -1040,44 +1033,44 @@ namespace ChatClient
 
                             if (chanUser.IsOwner)
                             {
-                                if (!listBoxUserList.Items.Contains("~" + chanUser.Nick.ToString()))
+                                if (!listBoxUserList.Items.Contains("~" + chanUser.Nick))
                                 {
-                                    listBoxUserList.Items.Add("~" + chanUser.Nick.ToString());
+                                    listBoxUserList.Items.Add("~" + chanUser.Nick);
                                 }
                             }
                             else if (chanUser.IsOp)
                             {
-                                if (!listBoxUserList.Items.Contains("@" + chanUser.Nick.ToString()))
+                                if (!listBoxUserList.Items.Contains("@" + chanUser.Nick))
                                 {
-                                    listBoxUserList.Items.Add("@" + chanUser.Nick.ToString());
+                                    listBoxUserList.Items.Add("@" + chanUser.Nick);
                                 }
                             }
                             else if (chanUser.IsHalfOp)
                             {
-                                if (!listBoxUserList.Items.Contains("%" + chanUser.Nick.ToString()))
+                                if (!listBoxUserList.Items.Contains("%" + chanUser.Nick))
                                 {
-                                    listBoxUserList.Items.Add("%" + chanUser.Nick.ToString());
+                                    listBoxUserList.Items.Add("%" + chanUser.Nick);
                                 }
                             }
                             else if (chanUser.IsVoice)
                             {
-                                if (!listBoxUserList.Items.Contains("+" + chanUser.Nick.ToString()))
+                                if (!listBoxUserList.Items.Contains("+" + chanUser.Nick))
                                 {
-                                    listBoxUserList.Items.Add("+" + chanUser.Nick.ToString());
+                                    listBoxUserList.Items.Add("+" + chanUser.Nick);
                                 }
                             }
                             else if (chanUser.IsProtected)
                             {
-                                if (!listBoxUserList.Items.Contains("&" + chanUser.Nick.ToString()))
+                                if (!listBoxUserList.Items.Contains("&" + chanUser.Nick))
                                 {
-                                    listBoxUserList.Items.Add("&" + chanUser.Nick.ToString());
+                                    listBoxUserList.Items.Add("&" + chanUser.Nick);
                                 }
                             }
                             else if (!chanUser.IsOp && !chanUser.IsVoice && !chanUser.IsHalfOp && !chanUser.IsOwner && !chanUser.IsProtected)
                             {
-                                if (!listBoxUserList.Items.Contains(chanUser.Nick.ToString()))
+                                if (!listBoxUserList.Items.Contains(chanUser.Nick))
                                 {
-                                    listBoxUserList.Items.Add(chanUser.Nick.ToString());
+                                    listBoxUserList.Items.Add(chanUser.Nick);
                                 }
                             }
                         }
@@ -1096,18 +1089,18 @@ namespace ChatClient
             {
                 if (!allowInput)
                 {
-                    AppendText(User.channel, "notice", data.ToString() + "\n");
+                    AppendText(User.Channel, "notice", data + "\n");
 
                     if (data.EndsWith("WARN SOCKET  - connection lost"))
                     {
-                        AppendText(User.channel, "notice", " -!- You've lost your connection to the chat server." + "\n");
+                        AppendText(User.Channel, "notice", " -!- You've lost your connection to the chat server." + "\n");
                     }
 
                     if (data.EndsWith("Checking ident...") ||
                         data.EndsWith("Checking Ident") ||
                         data.EndsWith("Checking ident"))
                     {
-                        AppendText(User.channel, "notice", " -!- You're still connecting. Be patient." + "\n");
+                        AppendText(User.Channel, "notice", " -!- You're still connecting. Be patient." + "\n");
                     }
                 }
 
@@ -1125,25 +1118,25 @@ namespace ChatClient
             {
                 if (tabControlChatTabs.InvokeRequired)
                 {
-                    tabControlChatTabs.Invoke(new OnChannelMessage_Delegate(irc_OnChannelMessage), new object[] { ircdata });
+                    tabControlChatTabs.Invoke(new OnChannelMessage_Delegate(irc_OnChannelMessage), ircdata);
                 }
                 else
                 {
-                    if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.channel, ircdata.Nick).Host))
+                    if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, ircdata.Nick).Host))
                     {
                         for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                         {
-                            if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(User.channel))
+                            if (tabControlChatTabs.TabPages[i].Text.Equals(User.Channel))
                             {
-                                AppendText(User.channel, "tag", "[");
-                                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                                AppendText(User.channel, "tag", "] <");
-                                AppendText(User.channel, "person", Nickname(ircdata.Nick.ToString()));
-                                AppendText(User.channel, "tag", "> ");
-                                AppendText(User.channel, "text", ircdata.Message.ToString());
-                                AppendText(User.channel, "text", "\n");
+                                AppendText(User.Channel, "tag", "[");
+                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                AppendText(User.Channel, "tag", "] <");
+                                AppendText(User.Channel, "person", Nickname(ircdata.Nick));
+                                AppendText(User.Channel, "tag", "> ");
+                                AppendText(User.Channel, "text", ircdata.Message);
+                                AppendText(User.Channel, "text", "\n");
 
-                                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] <" + ircdata.Nick.ToString() + "> " + ircdata.Message.ToString() + "\n");
+                                User.Log(User.Channel, "[" + DateTime.Now.ToShortTimeString() + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
 
                                 alPrivMsgAlert.Add(i);
 
@@ -1168,11 +1161,11 @@ namespace ChatClient
                 if (ircdata.Nick != null)
                 {
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
-                    AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- " + ircdata.Nick.ToString() + " - " + ircdata.Message.ToString() + "\n");
+                    AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- " + ircdata.Nick + " - " + ircdata.Message + "\n");
 
-                    User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " - " + ircdata.Message.ToString() + "\n");
+                    User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " - " + ircdata.Message + "\n");
                 }
             }
             catch (Exception ex)
@@ -1185,13 +1178,13 @@ namespace ChatClient
         {
             try
             {
-                if (this.InvokeRequired)
+                if (InvokeRequired)
                 {
-                    this.Invoke(new OnTopic_Delegate(irc_OnTopic), new object[] { str1, str2, ircdata });
+                    Invoke(new OnTopic_Delegate(irc_OnTopic), str1, str2, ircdata);
                 }
                 else
                 {
-                    this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + irc.Nickname + "] - " + irc.GetChannel(User.channel).Topic.ToString();
+                    Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + irc.GetChannel(User.Channel).Topic;
                 }
             }
             catch (Exception ex)
@@ -1216,12 +1209,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has taken operator status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken operator status from " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has taken operator status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has taken operator status from " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1234,12 +1227,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has given owner status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given owner status to " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has given owner status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has given owner status to " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1252,12 +1245,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has given halfop status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given halfop status to " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has given halfop status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has given halfop status to " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1270,12 +1263,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has given protect status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given protect status to " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has given protect status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has given protect status to " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1288,12 +1281,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has taken owner status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken owner status from " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has taken owner status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has taken owner status from " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1306,12 +1299,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has taken halfop status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken halfop status from " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has taken halfop status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has taken halfop status from " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1324,12 +1317,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has taken protect status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken protect status from " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has taken protect status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has taken protect status from " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1342,27 +1335,27 @@ namespace ChatClient
         {
             try
             {
-                if (irc.GetChannelUser(User.channel, str3).IsVoice)
+                if (irc.GetChannelUser(User.Channel, str3).IsVoice)
                 {
-                    irc.Devoice(User.channel, str3);
+                    irc.Devoice(User.Channel, str3);
                 }
 
-                if (irc.GetChannelUser(User.channel, str3).IsOwner)
+                if (irc.GetChannelUser(User.Channel, str3).IsOwner)
                 {
-                    irc.DeOwner(User.channel, str3);
+                    irc.DeOwner(User.Channel, str3);
                 }
 
-                if (irc.GetChannelUser(User.channel, str3).IsHalfOp)
+                if (irc.GetChannelUser(User.Channel, str3).IsHalfOp)
                 {
-                    irc.DeHalfOp(User.channel, str3);
+                    irc.DeHalfOp(User.Channel, str3);
                 }
 
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has given operator status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given operator status to " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has given operator status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has given operator status to " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1375,12 +1368,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has taken voice status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken voice status from " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has taken voice status from " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has taken voice status from " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1393,27 +1386,27 @@ namespace ChatClient
         {
             try
             {
-                if (irc.GetChannelUser(User.channel, str3).IsOp)
+                if (irc.GetChannelUser(User.Channel, str3).IsOp)
                 {
-                    irc.Deop(User.channel, str3);
+                    irc.Deop(User.Channel, str3);
                 }
 
-                if (irc.GetChannelUser(User.channel, str3).IsOwner)
+                if (irc.GetChannelUser(User.Channel, str3).IsOwner)
                 {
-                    irc.DeOwner(User.channel, str3);
+                    irc.DeOwner(User.Channel, str3);
                 }
 
-                if (irc.GetChannelUser(User.channel, str3).IsHalfOp)
+                if (irc.GetChannelUser(User.Channel, str3).IsHalfOp)
                 {
-                    irc.DeHalfOp(User.channel, str3);
+                    irc.DeHalfOp(User.Channel, str3);
                 }
 
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has given voice status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given voice status to " + str3 + " on " + str1 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has given voice status to " + str3.ToString() + " on " + str1.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has given voice status to " + str3 + " on " + str1 + "\n");
                 UpdateUserList(true);
             }
             catch (Exception ex)
@@ -1442,12 +1435,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has unbanned " + str3.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has unbanned " + str3 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has unbanned " + str3.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has unbanned " + str3 + "\n");
             }
             catch (Exception ex)
             {
@@ -1459,12 +1452,12 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + ircdata.Nick.ToString() + " has banned " + str3.ToString() + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has banned " + str3 + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + ircdata.Nick.ToString() + " has banned " + str3.ToString() + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " has banned " + str3 + "\n");
             }
             catch (Exception ex)
             {
@@ -1476,18 +1469,18 @@ namespace ChatClient
         {
             try
             {
-                AppendText(User.channel, "tag", "[");
-                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                AppendText(User.channel, "tag", "] ");
-                AppendText(User.channel, "notice", " -!- " + str2.ToString() + " was kicked from " + str1.ToString() + " by " + ircdata.Nick.ToString() + " (" + str4.ToString() + ")" + "\n");
+                AppendText(User.Channel, "tag", "[");
+                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "tag", "] ");
+                AppendText(User.Channel, "notice", " -!- " + str2 + " was kicked from " + str1 + " by " + ircdata.Nick + " (" + str4 + ")" + "\n");
 
-                User.Log(User.channel, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + str2.ToString() + " was kicked from " + str1.ToString() + " by " + ircdata.Nick.ToString() + " (" + str4.ToString() + ")" + "\n");
+                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + str2 + " was kicked from " + str1 + " by " + ircdata.Nick + " (" + str4 + ")" + "\n");
 
-                RemoveUserFromUserList(str2.ToString());
+                RemoveUserFromUserList(str2);
 
-                if (str2.Equals(User.username))
+                if (str2.Equals(User.Username))
                 {
-                    irc.Join(User.channel);
+                    irc.Join(User.Channel);
                 }
             }
             catch (Exception ex)
@@ -1505,8 +1498,8 @@ namespace ChatClient
 
                     if (ircdata.Nick != null)
                     {
-                        onQueryActionDelegate = new OnQueryAction_Delegate(OnQueryAction_DelegateFunction);
-                        IAsyncResult r = BeginInvoke(onQueryActionDelegate, new object[] { str1, ircdata });
+                        onQueryActionDelegate = OnQueryAction_DelegateFunction;
+                        IAsyncResult r = BeginInvoke(onQueryActionDelegate, str1, ircdata);
                         EndInvoke(r);
 
                     }
@@ -1524,8 +1517,8 @@ namespace ChatClient
             {
                 if (ircdata.Nick != null)
                 {
-                    onQueryMessageDelegate = new OnQueryMessage_Delegate(OnQueryMessage_DelegateFunction);
-                    IAsyncResult r = BeginInvoke(onQueryMessageDelegate, new object[] { ircdata });
+                    onQueryMessageDelegate = OnQueryMessage_DelegateFunction;
+                    IAsyncResult r = BeginInvoke(onQueryMessageDelegate, ircdata);
                     EndInvoke(r);
                 }
             }
@@ -1547,10 +1540,10 @@ namespace ChatClient
                         {
                             for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                             {
-                                if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(tabControlChatTabs.SelectedTab.Text))
+                                if (tabControlChatTabs.TabPages[i].Text.Equals(tabControlChatTabs.SelectedTab.Text))
                                 {
-                                    removeTabPageDelegate = new RemoveTabPage_Delegate(RemoveTabPage_DelegateFunction);
-                                    IAsyncResult r = BeginInvoke(removeTabPageDelegate, new object[] { tabControlChatTabs.TabPages[i] });
+                                    removeTabPageDelegate = RemoveTabPage_DelegateFunction;
+                                    IAsyncResult r = BeginInvoke(removeTabPageDelegate, tabControlChatTabs.TabPages[i]);
                                     EndInvoke(r);
                                 }
                             }
@@ -1559,9 +1552,9 @@ namespace ChatClient
 
                     if (e.KeyChar == (char)13)
                     {
-                        if (User.extra != null)
+                        if (User.Extra != null)
                         {
-                            this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + irc.Nickname + "] - " + User.extra.ToString();
+                            Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + User.Extra;
                         }
 
                         if (textBoxChatInput.Text.Length > 0)
@@ -1631,7 +1624,7 @@ namespace ChatClient
                                         {
                                             menuItemAutoConnect.Checked = true;
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned on\n");
                                         }
@@ -1640,7 +1633,7 @@ namespace ChatClient
                                         {
                                             menuItemAutoConnect.Checked = false;
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned off\n");
                                         }
@@ -1658,7 +1651,7 @@ namespace ChatClient
                                             ScrollChatWindow();
 
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned on\n");
                                         }
@@ -1669,7 +1662,7 @@ namespace ChatClient
                                             timerAutoScroll.Enabled = false;
 
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned off\n");
                                         }
@@ -1689,10 +1682,10 @@ namespace ChatClient
                                         {
                                             for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                                             {
-                                                if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(tabControlChatTabs.SelectedTab.Text))
+                                                if (tabControlChatTabs.TabPages[i].Text.Equals(tabControlChatTabs.SelectedTab.Text))
                                                 {
-                                                    removeTabPageDelegate = new RemoveTabPage_Delegate(RemoveTabPage_DelegateFunction);
-                                                    IAsyncResult r = BeginInvoke(removeTabPageDelegate, new object[] { tabControlChatTabs.TabPages[i] });
+                                                    removeTabPageDelegate = RemoveTabPage_DelegateFunction;
+                                                    IAsyncResult r = BeginInvoke(removeTabPageDelegate, tabControlChatTabs.TabPages[i]);
                                                     EndInvoke(r);
                                                 }
                                             }
@@ -1730,7 +1723,7 @@ namespace ChatClient
 
                                         for (int i = 1; i < split.Length; i++)
                                         {
-                                            comment += split[i].ToString() + " ";
+                                            comment += split[i] + " ";
                                         }
 
                                         if (comment != null)
@@ -1738,41 +1731,41 @@ namespace ChatClient
                                             comment = comment.TrimStart(' ');
                                         }
 
-                                        if (!split[0].ToString().Equals(irc.Nickname.ToString()))
+                                        if (!split[0].Equals(irc.Nickname))
                                         {
-                                            if (split[0].ToString().Equals("NickServ"))
+                                            if (split[0].Equals("NickServ"))
                                             {
                                                 split[0] = split[0].ToLower();
                                             }
 
-                                            if (listBoxUserList.Items.Contains(split[0].ToString()) || split[0].ToString().Equals("nickserv"))
+                                            if (listBoxUserList.Items.Contains(split[0]) || split[0].Equals("nickserv"))
                                             {
-                                                textBoxChatWindow = new Khendys.Controls.ExRichTextBox();
+                                                textBoxChatWindow = new ExRichTextBox();
 
-                                                textBoxChatWindow.BackColor = User.background;
-                                                textBoxChatWindow.ForeColor = User.text;
+                                                textBoxChatWindow.BackColor = User.Background;
+                                                textBoxChatWindow.ForeColor = User.Text;
                                                 textBoxChatWindow.ReadOnly = true;
-                                                textBoxChatWindow.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
+                                                textBoxChatWindow.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
 
-                                                tab = new TabPage(split[0].ToString());
+                                                tab = new TabPage(split[0]);
 
-                                                if (!alprivMsgs.Contains(split[0].ToString()))
+                                                if (!alprivMsgs.Contains(split[0]))
                                                 {
-                                                    textBoxChatWindow.Dock = System.Windows.Forms.DockStyle.Fill;
+                                                    textBoxChatWindow.Dock = DockStyle.Fill;
 
                                                     textBoxChatWindow.Visible = true;
 
                                                     tab.Controls.Add(textBoxChatWindow);
 
-                                                    alprivMsgs.Add(split[0].ToString());
+                                                    alprivMsgs.Add(split[0]);
 
                                                     alPrivMsgWindows = new ArrayList();
                                                     alPrivMsgWindows.Add(textBoxChatWindow);
 
                                                     alPrivMsgWindowList.Add(alPrivMsgWindows);
 
-                                                    addTabPageDelegate = new AddTabPage_Delegate(AddTabPage_DelegateFunction);
-                                                    IAsyncResult r = BeginInvoke(addTabPageDelegate, new object[] { tab });
+                                                    addTabPageDelegate = AddTabPage_DelegateFunction;
+                                                    IAsyncResult r = BeginInvoke(addTabPageDelegate, tab);
                                                     EndInvoke(r);
 
                                                     tabControlChatTabs.SelectedTab = tab;
@@ -1781,29 +1774,29 @@ namespace ChatClient
                                                     {
                                                         if (split[0].Equals("nickserv"))
                                                         {
-                                                            irc.Message(SendType.Message, split[0].ToString(), comment.ToString());
+                                                            irc.Message(SendType.Message, split[0], comment);
                                                         }
                                                         else
                                                         {
-                                                            irc.Message(SendType.Message, split[0].ToString(), comment.ToString());
+                                                            irc.Message(SendType.Message, split[0], comment);
                                                         }
 
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString().ToString());
+                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] <");
-                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname.ToString()));
+                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname));
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
-                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", comment.ToString());
+                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", comment);
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "text", "\n");
 
-                                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] <" + Nickname(irc.Nickname.ToString()) + "> " + comment.ToString() + "\n");
+                                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + Nickname(irc.Nickname) + "> " + comment + "\n");
                                                     }
                                                 }
                                                 else
                                                 {
                                                     for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                                                     {
-                                                        if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(split[0]))
+                                                        if (tabControlChatTabs.TabPages[i].Text.Equals(split[0]))
                                                         {
                                                             tab = tabControlChatTabs.TabPages[i];
                                                         }
@@ -1819,22 +1812,22 @@ namespace ChatClient
                                                             {
                                                                 if (split[0].Equals("nickserv"))
                                                                 {
-                                                                    irc.Message(SendType.Message, split[0].ToString(), comment.ToString());
+                                                                    irc.Message(SendType.Message, split[0], comment);
                                                                 }
                                                                 else
                                                                 {
-                                                                    irc.Message(SendType.Message, split[0].ToString(), comment.ToString());
+                                                                    irc.Message(SendType.Message, split[0], comment);
                                                                 }
 
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString().ToString());
+                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] <");
-                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname.ToString()));
+                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname));
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
-                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", comment.ToString());
+                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", comment);
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "text", "\n");
 
-                                                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] <" + Nickname(irc.Nickname.ToString()) + "> " + comment.ToString() + "\n");
+                                                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + Nickname(irc.Nickname) + "> " + comment + "\n");
                                                                 break;
                                                             }
                                                         }
@@ -1851,35 +1844,35 @@ namespace ChatClient
                                         if (listBoxUserList.Items.Contains(Nickname(nickname)))
                                         {
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- " + nickname + " is " +
-                                                irc.GetChannelUser(User.channel, nickname).Ident.ToString() + "@" +
-                                                irc.GetChannelUser(User.channel, nickname).Host.ToString() + " (" +
-                                                irc.GetChannelUser(User.channel, nickname).Realname.ToString() + ")\n");
+                                                irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
+                                                irc.GetChannelUser(User.Channel, nickname).Host + " (" +
+                                                irc.GetChannelUser(User.Channel, nickname).Realname + ")\n");
 
-                                            User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] " + " -!- " + nickname + " is " + irc.GetChannelUser(User.channel, nickname).Ident.ToString() + "@" + irc.GetChannelUser(User.channel, nickname).Host.ToString() + " (" + irc.GetChannelUser(User.channel, nickname).Realname.ToString() + ")\n");
+                                            User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + nickname + " is " + irc.GetChannelUser(User.Channel, nickname).Ident + "@" + irc.GetChannelUser(User.Channel, nickname).Host + " (" + irc.GetChannelUser(User.Channel, nickname).Realname + ")\n");
                                         }
                                     }
 
                                     if (textBoxChatInput.Text.StartsWith("/me "))
                                     {
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "action", "* " + irc.Nickname.ToString() + " ");
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "action", "* " + irc.Nickname + " ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "action", textBoxChatInput.Text.Substring(4));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "action", "\n");
 
                                         irc.Message(SendType.Action, tabControlChatTabs.SelectedTab.Text, textBoxChatInput.Text.Substring(4));
 
-                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] * " + irc.Nickname.ToString() + " " + textBoxChatInput.Text.Substring(4) + "\n");
+                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] * " + irc.Nickname + " " + textBoxChatInput.Text.Substring(4) + "\n");
                                     }
 
                                     if (textBoxChatInput.Text.Equals("/topic"))
                                     {
-                                        AppendText(User.channel, "notice", " -!- Topic: " + irc.GetChannel(User.channel).Topic.ToString() + "\n");
-                                        User.Log(User.channel, " -!- Topic: " + irc.GetChannel(User.channel).Topic.ToString() + "\n");
+                                        AppendText(User.Channel, "notice", " -!- Topic: " + irc.GetChannel(User.Channel).Topic + "\n");
+                                        User.Log(User.Channel, " -!- Topic: " + irc.GetChannel(User.Channel).Topic + "\n");
                                     }
 
                                     if (textBoxChatInput.Text.Equals("/clear"))
@@ -1889,8 +1882,8 @@ namespace ChatClient
 
                                     if (textBoxChatInput.Text.StartsWith("/topic "))
                                     {
-                                        if (irc.GetChannelUser(User.channel, irc.Nickname).IsOp ||
-                                            irc.GetChannelUser(User.channel, irc.Nickname).IsOwner)
+                                        if (irc.GetChannelUser(User.Channel, irc.Nickname).IsOp ||
+                                            irc.GetChannelUser(User.Channel, irc.Nickname).IsOwner)
                                         {
                                             string message = textBoxChatInput.Text.Substring(7);
                                             string[] split = message.Split(' ');
@@ -1898,18 +1891,18 @@ namespace ChatClient
                                             if (split.Length > 0)
                                             {
                                                 message = message.TrimEnd(' ');
-                                                AppendText(User.channel, "notice", " -!- " + irc.Nickname.ToString() + " changed the topic to: " + message + "\n");
+                                                AppendText(User.Channel, "notice", " -!- " + irc.Nickname + " changed the topic to: " + message + "\n");
 
-                                                irc.Topic(User.channel, message);
+                                                irc.Topic(User.Channel, message);
 
-                                                User.Log(User.channel, " -!- " + irc.Nickname.ToString() + " changed the topic to: " + message + "\n");
-                                                this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + irc.Nickname + "] - " + message.ToString();
+                                                User.Log(User.Channel, " -!- " + irc.Nickname + " changed the topic to: " + message + "\n");
+                                                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + message;
                                             }
                                         }
                                         else
                                         {
-                                            AppendText(User.channel, "notice", " -!- " + "You need to have operator status or higher in order to set the topic. This is a restriction imposed by " + Application.Name + " in order to protect the topic from being set by non-operators.\n");
-                                            User.Log(User.channel, " -!- " + "You need to have operator status or higher in order to set the topic. This is a restriction imposed by " + Application.Name + " in order to protect the topic from being set by non-operators.\n");
+                                            AppendText(User.Channel, "notice", " -!- " + "You need to have operator status or higher in order to set the topic. This is a restriction imposed by " + Application.Name + " in order to protect the topic from being set by non-operators.\n");
+                                            User.Log(User.Channel, " -!- " + "You need to have operator status or higher in order to set the topic. This is a restriction imposed by " + Application.Name + " in order to protect the topic from being set by non-operators.\n");
                                         }
                                     }
 
@@ -1920,27 +1913,27 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsVoice)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsVoice)
                                             {
-                                                irc.Devoice(User.channel, split[0].ToString());
+                                                irc.Devoice(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOwner)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOwner)
                                             {
-                                                irc.DeOwner(User.channel, split[0].ToString());
+                                                irc.DeOwner(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsHalfOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsHalfOp)
                                             {
-                                                irc.DeHalfOp(User.channel, split[0].ToString());
+                                                irc.DeHalfOp(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOp)
                                             {
-                                                irc.Deop(User.channel, split[0].ToString());
+                                                irc.Deop(User.Channel, split[0]);
                                             }
 
-                                            irc.Protect(User.channel, split[0].ToString());
+                                            irc.Protect(User.Channel, split[0]);
                                         }
                                     }
 
@@ -1951,27 +1944,27 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsVoice)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsVoice)
                                             {
-                                                irc.Devoice(User.channel, split[0].ToString());
+                                                irc.Devoice(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOwner)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOwner)
                                             {
-                                                irc.DeOwner(User.channel, split[0].ToString());
+                                                irc.DeOwner(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOp)
                                             {
-                                                irc.Deop(User.channel, split[0].ToString());
+                                                irc.Deop(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsProtected)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.DeProtect(User.channel, split[0].ToString());
+                                                irc.DeProtect(User.Channel, split[0]);
                                             }
 
-                                            irc.HalfOp(User.channel, split[0].ToString());
+                                            irc.HalfOp(User.Channel, split[0]);
                                         }
                                     }
 
@@ -1982,27 +1975,27 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsVoice)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsVoice)
                                             {
-                                                irc.Devoice(User.channel, split[0].ToString());
+                                                irc.Devoice(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOp)
                                             {
-                                                irc.Deop(User.channel, split[0].ToString());
+                                                irc.Deop(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsHalfOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsHalfOp)
                                             {
-                                                irc.DeHalfOp(User.channel, split[0].ToString());
+                                                irc.DeHalfOp(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsProtected)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.DeProtect(User.channel, split[0].ToString());
+                                                irc.DeProtect(User.Channel, split[0]);
                                             }
 
-                                            irc.Owner(User.channel, split[0].ToString());
+                                            irc.Owner(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2013,27 +2006,27 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsVoice)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsVoice)
                                             {
-                                                irc.Devoice(User.channel, split[0].ToString());
+                                                irc.Devoice(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOwner)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOwner)
                                             {
-                                                irc.DeOwner(User.channel, split[0].ToString());
+                                                irc.DeOwner(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsHalfOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsHalfOp)
                                             {
-                                                irc.DeHalfOp(User.channel, split[0].ToString());
+                                                irc.DeHalfOp(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsProtected)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.DeProtect(User.channel, split[0].ToString());
+                                                irc.DeProtect(User.Channel, split[0]);
                                             }
 
-                                            irc.Op(User.channel, split[0].ToString());
+                                            irc.Op(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2044,7 +2037,7 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.DeOwner(User.channel, split[0].ToString());
+                                            irc.DeOwner(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2055,7 +2048,7 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.DeHalfOp(User.channel, split[0].ToString());
+                                            irc.DeHalfOp(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2066,7 +2059,7 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.DeProtect(User.channel, split[0].ToString());
+                                            irc.DeProtect(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2077,7 +2070,7 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.Deop(User.channel, split[0].ToString());
+                                            irc.Deop(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2085,13 +2078,13 @@ namespace ChatClient
                                     {
                                         string user = textBoxChatInput.Text.Substring(8);
 
-                                        if (user != User.username)
+                                        if (user != User.Username)
                                         {
-                                            alIgnoredHosts.Add(irc.GetChannelUser(User.channel, user).Host.ToString());
+                                            alIgnoredHosts.Add(irc.GetChannelUser(User.Channel, user).Host);
 
                                             using (StreamWriter sw = new StreamWriter("ignore", true))
                                             {
-                                                sw.WriteLine(irc.GetChannelUser(User.channel, user).Host.ToString());
+                                                sw.WriteLine(irc.GetChannelUser(User.Channel, user).Host);
                                             }
                                         }
                                     }
@@ -2103,26 +2096,26 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.Voice(User.channel, split[0].ToString());
+                                            irc.Voice(User.Channel, split[0]);
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOp)
                                             {
-                                                irc.Deop(User.channel, split[0].ToString());
+                                                irc.Deop(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsOwner)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsOwner)
                                             {
-                                                irc.DeOwner(User.channel, split[0].ToString());
+                                                irc.DeOwner(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsProtected)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.DeProtect(User.channel, split[0].ToString());
+                                                irc.DeProtect(User.Channel, split[0]);
                                             }
 
-                                            if (irc.GetChannelUser(User.channel, split[0].ToString()).IsHalfOp)
+                                            if (irc.GetChannelUser(User.Channel, split[0]).IsHalfOp)
                                             {
-                                                irc.DeHalfOp(User.channel, split[0].ToString());
+                                                irc.DeHalfOp(User.Channel, split[0]);
                                             }
                                         }
                                     }
@@ -2134,7 +2127,7 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.Devoice(User.channel, split[0].ToString());
+                                            irc.Devoice(User.Channel, split[0]);
                                         }
                                     }
 
@@ -2145,19 +2138,19 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            if (!irc.GetChannelUser(User.channel, split[0]).IsOwner &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsOp &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsHalfOp &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsProtected)
+                                            if (!irc.GetChannelUser(User.Channel, split[0]).IsOwner &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsOp &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsHalfOp &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.Ban(User.channel, irc.GetChannelUser(User.channel, split[0].ToString()).Host.ToString());
+                                                irc.Ban(User.Channel, irc.GetChannelUser(User.Channel, split[0]).Host);
                                             }
                                             else
                                             {
-                                                AppendText(User.channel, "tag", "[");
-                                                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                                                AppendText(User.channel, "tag", "] ");
-                                                AppendText(User.channel, "notice", " -!- Ban failed. " + split[0] + " is a protected user\n");
+                                                AppendText(User.Channel, "tag", "[");
+                                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                                AppendText(User.Channel, "tag", "] ");
+                                                AppendText(User.Channel, "notice", " -!- Ban failed. " + split[0] + " is a protected user\n");
                                             }
                                         }
                                     }
@@ -2169,7 +2162,7 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            irc.Unban(User.channel, irc.GetChannelUser(User.channel, split[0].ToString()).Host.ToString());
+                                            irc.Unban(User.Channel, irc.GetChannelUser(User.Channel, split[0]).Host);
                                         }
                                     }
 
@@ -2180,19 +2173,19 @@ namespace ChatClient
 
                                         if (split.Length == 1)
                                         {
-                                            if (!irc.GetChannelUser(User.channel, split[0]).IsOwner &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsOp &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsHalfOp &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsProtected)
+                                            if (!irc.GetChannelUser(User.Channel, split[0]).IsOwner &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsOp &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsHalfOp &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.Kick(User.channel, split[0]);
+                                                irc.Kick(User.Channel, split[0]);
                                             }
                                             else
                                             {
-                                                AppendText(User.channel, "tag", "[");
-                                                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                                                AppendText(User.channel, "tag", "] ");
-                                                AppendText(User.channel, "notice", " -!- Kick failed. " + split[0] + " is a protected user\n");
+                                                AppendText(User.Channel, "tag", "[");
+                                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                                AppendText(User.Channel, "tag", "] ");
+                                                AppendText(User.Channel, "notice", " -!- Kick failed. " + split[0] + " is a protected user\n");
                                             }
                                         }
 
@@ -2202,24 +2195,24 @@ namespace ChatClient
 
                                             for (int j = 0; j < split.Length; j++)
                                             {
-                                                reason += split[j].ToString() + " ";
+                                                reason += split[j] + " ";
                                             }
 
                                             reason = reason.TrimEnd(' ');
 
-                                            if (!irc.GetChannelUser(User.channel, split[0]).IsOwner &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsOp &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsHalfOp &&
-                                                !irc.GetChannelUser(User.channel, split[0]).IsProtected)
+                                            if (!irc.GetChannelUser(User.Channel, split[0]).IsOwner &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsOp &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsHalfOp &&
+                                                !irc.GetChannelUser(User.Channel, split[0]).IsProtected)
                                             {
-                                                irc.Kick(User.channel, split[0].ToString(), reason.ToString());
+                                                irc.Kick(User.Channel, split[0], reason);
                                             }
                                             else
                                             {
-                                                AppendText(User.channel, "tag", "[");
-                                                AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                                                AppendText(User.channel, "tag", "] ");
-                                                AppendText(User.channel, "notice", " -!- Kick failed. " + split[0] + " is a protected user\n");
+                                                AppendText(User.Channel, "tag", "[");
+                                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                                AppendText(User.Channel, "tag", "] ");
+                                                AppendText(User.Channel, "notice", " -!- Kick failed. " + split[0] + " is a protected user\n");
                                             }
                                         }
                                     }
@@ -2228,23 +2221,23 @@ namespace ChatClient
                                     {
                                         string message = textBoxChatInput.Text.Substring(6);
                                         string[] split = message.Split(' ');
-                                        User.username = split[0];
-                                        irc.Nick(split[0].ToString());
-                                        this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + split[0].ToString() + "] - " + irc.GetChannel(User.channel).Topic.ToString();
+                                        User.Username = split[0];
+                                        irc.Nick(split[0]);
+                                        Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + split[0] + "] - " + irc.GetChannel(User.Channel).Topic;
                                     }
                                 }
                             }
                             else
                             {
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString().ToString());
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] <");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname.ToString()));
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname));
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "text", textBoxChatInput.Text + "\n");
 
                                 irc.Message(SendType.Message, tabControlChatTabs.SelectedTab.Text, textBoxChatInput.Text);
-                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString().ToString() + "] <" + Nickname(irc.Nickname.ToString()) + "> " + textBoxChatInput.Text + "\n");
+                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + Nickname(irc.Nickname) + "> " + textBoxChatInput.Text + "\n");
                             }
                         }
                         textBoxChatInput.Clear();
@@ -2261,14 +2254,14 @@ namespace ChatClient
                                 if (textBoxChatInput.Text.StartsWith("/server "))
                                 {
                                     string message = textBoxChatInput.Text.Substring(8);
-                                    User.server = message;
+                                    User.Server = message;
 
-                                    Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser;
+                                    RegistryKey key = Registry.CurrentUser;
                                     key = key.CreateSubKey("SOFTWARE\\" + Application.Name);
-                                    key.SetValue("server", User.server.ToString());
+                                    key.SetValue("server", User.Server);
 
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Server address has been set to " + message + "\n");
                                 }
@@ -2279,20 +2272,20 @@ namespace ChatClient
 
                                     try
                                     {
-                                        User.port = Convert.ToInt32(message);
-                                        Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser;
+                                        User.Port = Convert.ToInt32(message);
+                                        RegistryKey key = Registry.CurrentUser;
                                         key = key.CreateSubKey("SOFTWARE\\" + Application.Name);
-                                        key.SetValue("port", User.port);
+                                        key.SetValue("port", User.Port);
 
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Server port has been set to " + message + "\n");
                                     }
-                                    catch (System.FormatException)
+                                    catch (FormatException)
                                     {
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Server port must be a number\n");
                                     }
@@ -2302,15 +2295,15 @@ namespace ChatClient
                                 {
                                     string message = textBoxChatInput.Text.Substring(9);
 
-                                    User.channel = message;
-                                    Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser;
+                                    User.Channel = message;
+                                    RegistryKey key = Registry.CurrentUser;
                                     key = key.CreateSubKey("SOFTWARE\\" + Application.Name);
-                                    key.SetValue("channel", User.channel.ToString());
+                                    key.SetValue("channel", User.Channel);
 
-                                    tabControlChatTabs.TabPages[0].Text = User.channel;
+                                    tabControlChatTabs.TabPages[0].Text = User.Channel;
 
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Channel name has been set to " + message + "\n");
                                 }
@@ -2343,7 +2336,7 @@ namespace ChatClient
                                     {
                                         menuItemAutoConnect.Checked = true;
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned on\n");
                                     }
@@ -2352,7 +2345,7 @@ namespace ChatClient
                                     {
                                         menuItemAutoConnect.Checked = false;
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned off\n");
                                     }
@@ -2368,7 +2361,7 @@ namespace ChatClient
                                         timerAutoScroll.Enabled = true;
                                         ScrollChatWindow();
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned on\n");
                                     }
@@ -2378,7 +2371,7 @@ namespace ChatClient
                                         menuItemAutoScroll.Checked = false;
                                         timerAutoScroll.Enabled = false;
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned off\n");
                                     }
@@ -2389,21 +2382,21 @@ namespace ChatClient
                                     string message = textBoxChatInput.Text.Substring(6);
                                     string[] split = message.Split(' ');
 
-                                    AppendText(User.channel, "tag", "[");
-                                    AppendText(User.channel, "time", DateTime.Now.ToShortTimeString().ToString());
-                                    AppendText(User.channel, "tag", "] ");
-                                    AppendText(User.channel, "notice", " -!- " + User.username.ToString() + " is now known as " + split[0].ToString() + "\n");
+                                    AppendText(User.Channel, "tag", "[");
+                                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(User.Channel, "tag", "] ");
+                                    AppendText(User.Channel, "notice", " -!- " + User.Username + " is now known as " + split[0] + "\n");
 
-                                    User.username = split[0];
-                                    this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + User.username + "]";
+                                    User.Username = split[0];
+                                    Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Username + "]";
                                 }
 
                                 if (textBoxChatInput.Text.StartsWith("/me "))
                                 {
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "action", "* " + User.username.ToString() + " ");
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "action", "* " + User.Username + " ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "action", textBoxChatInput.Text.Substring(4));
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "action", "\n");
                                 }
@@ -2437,9 +2430,9 @@ namespace ChatClient
                             else
                             {
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString().ToString());
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] (offline) <");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", User.username.ToString());
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", User.Username);
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", textBoxChatInput.Text);
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "text", "\n");
@@ -2468,7 +2461,7 @@ namespace ChatClient
             }
         }
 
-        private void ChatForm_Resize(object sender, System.EventArgs e)
+        private void ChatForm_Resize(object sender, EventArgs e)
         {
             try
             {
@@ -2496,7 +2489,7 @@ namespace ChatClient
                         {
                             if (tabControlChatTabs.SelectedTab.Controls[i].GetType().Name == "ExRichTextBox")
                             {
-                                Khendys.Controls.ExRichTextBox chat = (Khendys.Controls.ExRichTextBox)tabControlChatTabs.SelectedTab.Controls[i];
+                                ExRichTextBox chat = (ExRichTextBox)tabControlChatTabs.SelectedTab.Controls[i];
 
                                 SetScrollPos(chat.Handle, chat.Lines.Length, 0, true);
                                 SendMessage(chat.Handle, EM_LINESCROLL, 0, 1);
@@ -2517,23 +2510,23 @@ namespace ChatClient
         {
             try
             {
-                Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser;
+                RegistryKey key = Registry.CurrentUser;
                 key = key.CreateSubKey("SOFTWARE\\" + Application.Name);
-                key.SetValue("server", User.server.ToString());
-                key.SetValue("channel", User.channel.ToString());
-                key.SetValue("fontsize", Convert.ToInt32(User.defaultFontSize));
+                key.SetValue("server", User.Server);
+                key.SetValue("channel", User.Channel);
+                key.SetValue("fontsize", Convert.ToInt32(User.DefaultFontSize));
 
-                key.SetValue("port", User.port);
-                key.SetValue("username", User.username);
-                key.SetValue("quitmsg", mstrQuitMessage.ToString());
-                key.SetValue("fontfamily", User.defaultFontFamily.ToString());
+                key.SetValue("port", User.Port);
+                key.SetValue("username", User.Username);
+                key.SetValue("quitmsg", mstrQuitMessage);
+                key.SetValue("fontfamily", User.DefaultFontFamily);
 
-                if (User.defaultFontStyle == FontStyle.Bold)
+                if (User.DefaultFontStyle == FontStyle.Bold)
                 {
                     key.SetValue("fontstyle", "bold");
                 }
 
-                if (User.defaultFontStyle == FontStyle.Regular)
+                if (User.DefaultFontStyle == FontStyle.Regular)
                 {
                     key.SetValue("fontstyle", "regular");
                 }
@@ -2562,7 +2555,7 @@ namespace ChatClient
             }
         }
 
-        private void ChatForm_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private void ChatForm_Closing(object sender, CancelEventArgs e)
         {
             try
             {
@@ -2578,25 +2571,25 @@ namespace ChatClient
         {
             try
             {
-                if (this.InvokeRequired)
+                if (InvokeRequired)
                 {
-                    this.Invoke(new Exit_Delegate(Exit));
+                    Invoke(new Exit_Delegate(Exit));
                 }
                 else
                 {
-                    this.Opacity = 0;
+                    Opacity = 0;
                     
                     if (irc != null)
                     {
                         irc.Quit(mstrQuitMessage);
-                        System.Threading.Thread.Sleep(500);
+                        Thread.Sleep(500);
 
                         irc.Disconnect();
                     }
 
                     SaveSettingsBeforeClosing();
 
-                    System.Environment.Exit(0);
+                    Environment.Exit(0);
                 }
             }
             catch (Exception ex)
@@ -2605,7 +2598,7 @@ namespace ChatClient
             }
         }
 
-        private void tabControlChatTabs_SelectedIndexChanged(object sender, System.EventArgs e)
+        private void tabControlChatTabs_SelectedIndexChanged(object sender, EventArgs e)
         {
             try
             {
@@ -2623,42 +2616,42 @@ namespace ChatClient
             }
         }
 
-        private void listBoxUsers_DoubleClick(object sender, System.EventArgs e)
+        private void listBoxUsers_DoubleClick(object sender, EventArgs e)
         {
             try
             {
                 if (listBoxUserList.SelectedItem.ToString() != null)
                 {
-                    string user = listBoxUserList.SelectedItem.ToString().TrimStart(new char[] { '@', '+', '~', '&', '%' });
-                    if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.channel, user).Host))
+                    string user = listBoxUserList.SelectedItem.ToString().TrimStart('@', '+', '~', '&', '%');
+                    if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, user).Host))
                     {
-                        if (!user.Equals(irc.Nickname.ToString()))
+                        if (!user.Equals(irc.Nickname))
                         {
-                            textBoxChatWindow = new Khendys.Controls.ExRichTextBox();
+                            textBoxChatWindow = new ExRichTextBox();
 
-                            textBoxChatWindow.BackColor = User.background;
-                            textBoxChatWindow.ForeColor = User.text;
+                            textBoxChatWindow.BackColor = User.Background;
+                            textBoxChatWindow.ForeColor = User.Text;
                             textBoxChatWindow.ReadOnly = true;
-                            textBoxChatWindow.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
+                            textBoxChatWindow.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
 
-                            tab = new TabPage(user.ToString());
+                            tab = new TabPage(user);
 
-                            if (!alprivMsgs.Contains(user.ToString()))
+                            if (!alprivMsgs.Contains(user))
                             {
 
-                                textBoxChatWindow.Dock = System.Windows.Forms.DockStyle.Fill;
+                                textBoxChatWindow.Dock = DockStyle.Fill;
                                 textBoxChatWindow.Visible = true;
 
                                 tab.Controls.Add(textBoxChatWindow);
 
-                                alprivMsgs.Add(user.ToString());
+                                alprivMsgs.Add(user);
 
                                 alPrivMsgWindows = new ArrayList();
                                 alPrivMsgWindows.Add(textBoxChatWindow);
                                 alPrivMsgWindowList.Add(alPrivMsgWindows);
 
-                                addTabPageDelegate = new AddTabPage_Delegate(AddTabPage_DelegateFunction);
-                                IAsyncResult r = BeginInvoke(addTabPageDelegate, new object[] { tab });
+                                addTabPageDelegate = AddTabPage_DelegateFunction;
+                                IAsyncResult r = BeginInvoke(addTabPageDelegate, tab);
                                 EndInvoke(r);
 
                                 tabControlChatTabs.SelectedTab = tab;
@@ -2666,18 +2659,18 @@ namespace ChatClient
                                 string nickname = user;
 
                                 AppendText(tab.Text, "tag", "[");
-                                AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                                AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
                                 AppendText(tab.Text, "tag", "] ");
                                 AppendText(tab.Text, "notice", " -!- " + nickname + " is " +
-                                    irc.GetChannelUser(User.channel, nickname).Ident.ToString() + "@" +
-                                    irc.GetChannelUser(User.channel, nickname).Host.ToString() + " (" +
-                                    irc.GetChannelUser(User.channel, nickname).Realname.ToString() + ")\n");
+                                    irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
+                                    irc.GetChannelUser(User.Channel, nickname).Host + " (" +
+                                    irc.GetChannelUser(User.Channel, nickname).Realname + ")\n");
                             }
                             else
                             {
                                 for (int i = 0; i < tabControlChatTabs.TabPages.Count; i++)
                                 {
-                                    if (tabControlChatTabs.TabPages[i].Text.ToString().Equals(user))
+                                    if (tabControlChatTabs.TabPages[i].Text.Equals(user))
                                     {
                                         tab = tabControlChatTabs.TabPages[i];
                                     }
@@ -2701,7 +2694,7 @@ namespace ChatClient
             }
         }
 
-        private void menuItemExit_Click(object sender, System.EventArgs e)
+        private void menuItemExit_Click(object sender, EventArgs e)
         {
             try
             {
@@ -2713,11 +2706,11 @@ namespace ChatClient
             }
         }
 
-        private void menuItemConnect_Click(object sender, System.EventArgs e)
+        private void menuItemConnect_Click(object sender, EventArgs e)
         {
             try
             {
-                AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Attempting connection to " + User.server + ":" + User.port.ToString() + "\n");
+                AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Attempting connection to " + User.Server + ":" + User.Port + "\n");
 
                 if (File.Exists("ignore"))
                 {
@@ -2727,7 +2720,7 @@ namespace ChatClient
 
                         while ((line = sr.ReadLine()) != null)
                         {
-                            alIgnoredHosts.Add(line.ToString());
+                            alIgnoredHosts.Add(line);
                         }
                     }
                 }
@@ -2737,62 +2730,62 @@ namespace ChatClient
                 irc.AutoRetry = false;
                 irc.ChannelSyncing = true;
 
-                irc.OnTopic += new TopicEventHandler(irc_OnTopic);
-                irc.OnDisconnected += new SimpleEventHandler(irc_OnDisconnected);
-                irc.OnDeop += new DeopEventHandler(irc_OnDeop);
-                irc.OnOp += new OpEventHandler(irc_OnOp);
-                irc.OnOwner += new OwnerEventHandler(irc_OnOwner);
-                irc.OnHalfOp += new HalfOpEventHandler(irc_OnHalfOp);
-                irc.OnProtect += new ProtectEventHandler(irc_OnProtect);
-                irc.OnDeOwner += new DeOwnerEventHandler(irc_OnDeOwner);
-                irc.OnDeHalfOp += new DeHalfOpEventHandler(irc_OnDeHalfOp);
-                irc.OnDeProtect += new DeProtectEventHandler(irc_OnDeProtect);
-                irc.OnDevoice += new DevoiceEventHandler(irc_OnDevoice);
-                irc.OnVoice += new VoiceEventHandler(irc_OnVoice);
-                irc.OnWho += new WhoEventHandler(irc_OnWho);
-                irc.OnModeChange += new MessageEventHandler(irc_OnModeChange);
-                irc.OnUserModeChange += new MessageEventHandler(irc_OnUserModeChange);
-                irc.OnUnban += new UnbanEventHandler(irc_OnUnban);
-                irc.OnBan += new BanEventHandler(irc_OnBan);
-                irc.OnKick += new KickEventHandler(irc_OnKick);
-                irc.OnQueryAction += new ActionEventHandler(irc_OnQueryAction);
-                irc.OnQuit += new QuitEventHandler(irc_OnQuit);
-                irc.OnNickChange += new NickChangeEventHandler(irc_OnNickChange);
-                irc.OnChannelAction += new ActionEventHandler(irc_OnChannelAction);
-                irc.OnReadLine += new ReadLineEventHandler(irc_OnReadLine);
-                irc.OnJoin += new JoinEventHandler(irc_OnJoin);
-                irc.OnPart += new PartEventHandler(irc_OnPart);
-                irc.OnQueryNotice += new MessageEventHandler(irc_OnQueryNotice);
-                irc.OnChannelMessage += new MessageEventHandler(irc_OnChannelMessage);
-                irc.OnQueryMessage += new MessageEventHandler(irc_OnQueryMessage);
+                irc.OnTopic += irc_OnTopic;
+                irc.OnDisconnected += irc_OnDisconnected;
+                irc.OnDeop += irc_OnDeop;
+                irc.OnOp += irc_OnOp;
+                irc.OnOwner += irc_OnOwner;
+                irc.OnHalfOp += irc_OnHalfOp;
+                irc.OnProtect += irc_OnProtect;
+                irc.OnDeOwner += irc_OnDeOwner;
+                irc.OnDeHalfOp += irc_OnDeHalfOp;
+                irc.OnDeProtect += irc_OnDeProtect;
+                irc.OnDevoice += irc_OnDevoice;
+                irc.OnVoice += irc_OnVoice;
+                irc.OnWho += irc_OnWho;
+                irc.OnModeChange += irc_OnModeChange;
+                irc.OnUserModeChange += irc_OnUserModeChange;
+                irc.OnUnban += irc_OnUnban;
+                irc.OnBan += irc_OnBan;
+                irc.OnKick += irc_OnKick;
+                irc.OnQueryAction += irc_OnQueryAction;
+                irc.OnQuit += irc_OnQuit;
+                irc.OnNickChange += irc_OnNickChange;
+                irc.OnChannelAction += irc_OnChannelAction;
+                irc.OnReadLine += irc_OnReadLine;
+                irc.OnJoin += irc_OnJoin;
+                irc.OnPart += irc_OnPart;
+                irc.OnQueryNotice += irc_OnQueryNotice;
+                irc.OnChannelMessage += irc_OnChannelMessage;
+                irc.OnQueryMessage += irc_OnQueryMessage;
 
-                if (irc.Connect(User.server, User.port))
+                if (irc.Connect(User.Server, User.Port))
                 {
-                    irc.Login(User.username, Application.Name + " " + Application.Version);
-                    irc.Join(User.channel);
+                    irc.Login(User.Username, Application.Name + " " + Application.Version);
+                    irc.Join(User.Channel);
 
                     if (irc.Connected)
                     {
                         menuItemConnect.Enabled = false;
                         menuItemDisconnect.Enabled = true;
 
-                        threadIrcConnection = new Thread(new ThreadStart(IRCListenThread));
+                        threadIrcConnection = new Thread(IRCListenThread);
                         threadIrcConnection.Start();
                     }
                     else
                     {
                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
-                        AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Unable to connect to " + User.server + ":" + User.port.ToString() + "\n");
+                        AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Unable to connect to " + User.Server + ":" + User.Port + "\n");
                     }
                 }
                 else
                 {
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
-                    AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- A connection to " + User.server + ":" + User.port.ToString() + " could not be established.\n");
+                    AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- A connection to " + User.Server + ":" + User.Port + " could not be established.\n");
                 }
             }
             catch (Exception ex)
@@ -2801,7 +2794,7 @@ namespace ChatClient
             }
         }
 
-        private void tabControlChatTabs_DrawItem(object sender, System.Windows.Forms.DrawItemEventArgs e)
+        private void tabControlChatTabs_DrawItem(object sender, DrawItemEventArgs e)
         {
             try
             {
@@ -2843,7 +2836,7 @@ namespace ChatClient
                     }
                 }
 
-                string tabName = this.tabControlChatTabs.TabPages[e.Index].Text;
+                string tabName = tabControlChatTabs.TabPages[e.Index].Text;
                 StringFormat sftTab = new StringFormat();
 
                 e.Graphics.FillRectangle(bshBack, e.Bounds);
@@ -2858,7 +2851,7 @@ namespace ChatClient
             }
         }
 
-        private void menuItemDisconnect_Click(object sender, System.EventArgs e)
+        private void menuItemDisconnect_Click(object sender, EventArgs e)
         {
             try
             {
@@ -2868,11 +2861,11 @@ namespace ChatClient
                 menuItemConnect.Enabled = true;
                 menuItemDisconnect.Enabled = false;
 
-                AppendText(User.channel, "notice", "-------------------------------------" + "\n");
-                AppendText(User.channel, "notice", " -!- You have been disconnected from the IRC server.");
-                AppendText(User.channel, "text", "\n");
+                AppendText(User.Channel, "notice", "-------------------------------------" + "\n");
+                AppendText(User.Channel, "notice", " -!- You have been disconnected from the IRC server.");
+                AppendText(User.Channel, "text", "\n");
 
-                this.Text = Application.Name + " [" + User.server + ":" + User.port.ToString() + ", " + User.username + "]";
+                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Username + "]";
                 listBoxUserList.Items.Clear();
             }
             catch (Exception ex)
@@ -2899,50 +2892,50 @@ namespace ChatClient
             {
                 if (exRichTextBoxChatOutput.InvokeRequired)
                 {
-                    exRichTextBoxChatOutput.Invoke(new RichTextBoxUpdate_Delegate(AppendText), new object[] { target, type, text });
+                    exRichTextBoxChatOutput.Invoke(new RichTextBoxUpdate_Delegate(AppendText), target, type, text);
                 }
                 else
                 {
-                    textBoxChatInput.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
-                    tabControlChatTabs.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
-                    listBoxUserList.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
+                    textBoxChatInput.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
+                    tabControlChatTabs.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
+                    listBoxUserList.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
 
-                    if (target.Equals(User.channel))
+                    if (target.Equals(User.Channel))
                     {
                         switch (type)
                         {
                             case "tag":
-                                exRichTextBoxChatOutput.SelectionColor = User.tag;
+                                exRichTextBoxChatOutput.SelectionColor = User.Tag;
                                 break;
                             case "time":
-                                exRichTextBoxChatOutput.SelectionColor = User.time;
+                                exRichTextBoxChatOutput.SelectionColor = User.Time;
                                 break;
                             case "action":
-                                exRichTextBoxChatOutput.SelectionColor = User.action;
+                                exRichTextBoxChatOutput.SelectionColor = User.Action1;
                                 break;
                             case "yourself":
-                                exRichTextBoxChatOutput.SelectionColor = User.yourself;
+                                exRichTextBoxChatOutput.SelectionColor = User.Yourself;
                                 break;
                             case "text":
-                                exRichTextBoxChatOutput.SelectionColor = User.text;
+                                exRichTextBoxChatOutput.SelectionColor = User.Text;
                                 break;
                             case "notice":
-                                exRichTextBoxChatOutput.SelectionColor = User.notice;
+                                exRichTextBoxChatOutput.SelectionColor = User.Notice;
                                 break;
                             case "person":
-                                exRichTextBoxChatOutput.SelectionColor = User.person;
+                                exRichTextBoxChatOutput.SelectionColor = User.Person;
                                 break;
                         }
 
-                        exRichTextBoxChatOutput.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
+                        exRichTextBoxChatOutput.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
 
                         exRichTextBoxChatOutput.AppendText(text);
                     }
                     else
                     {
                         ArrayList chatWindows = new ArrayList();
-                        Khendys.Controls.ExRichTextBox chat = new Khendys.Controls.ExRichTextBox();
-                        chat.Font = new Font(User.defaultFontFamily, User.defaultFontSize, User.defaultFontStyle, System.Drawing.GraphicsUnit.Point, ((System.Byte)(0)));
+                        ExRichTextBox chat = new ExRichTextBox();
+                        chat.Font = new Font(User.DefaultFontFamily, User.DefaultFontSize, User.DefaultFontStyle, GraphicsUnit.Point, 0);
 
                         if (alprivMsgs.Count > 0)
                         {
@@ -2951,49 +2944,49 @@ namespace ChatClient
                             switch (type)
                             {
                                 case "tag":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.tag;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Tag;
                                     chatWindows[0] = chat;
                                     break;
 
                                 case "time":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.time;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Time;
                                     chatWindows[0] = chat;
                                     break;
 
                                 case "action":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.action;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Action1;
                                     chatWindows[0] = chat;
                                     break;
 
                                 case "yourself":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.yourself;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Yourself;
                                     chatWindows[0] = chat;
                                     break;
 
                                 case "text":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.text;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Text;
                                     chatWindows[0] = chat;
                                     break;
 
                                 case "notice":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.notice;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Notice;
                                     chatWindows[0] = chat;
                                     break;
 
                                 case "person":
-                                    chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
-                                    chat.SelectionColor = User.person;
+                                    chat = (ExRichTextBox)chatWindows[0];
+                                    chat.SelectionColor = User.Person;
                                     chatWindows[0] = chat;
                                     break;
                             }
 
-                            chat = (Khendys.Controls.ExRichTextBox)chatWindows[0];
+                            chat = (ExRichTextBox)chatWindows[0];
                             chat.AppendText(text);
                             chatWindows[0] = chat;
 
@@ -3022,7 +3015,7 @@ namespace ChatClient
             }
         }
 
-        private void menuItemAutoScroll_Click(object sender, System.EventArgs e)
+        private void menuItemAutoScroll_Click(object sender, EventArgs e)
         {
             if (menuItemAutoScroll.Checked)
             {
@@ -3037,13 +3030,13 @@ namespace ChatClient
             }
         }
 
-        private void exRichTextBoxChatOutput_LinkClicked(object sender, System.Windows.Forms.LinkClickedEventArgs e)
+        private void exRichTextBoxChatOutput_LinkClicked(object sender, LinkClickedEventArgs e)
         {
             try
             {
                 mstrUrl = e.LinkText;
 
-                Thread threadOpenWebsite = new Thread(new ThreadStart(OpenWebsite));
+                Thread threadOpenWebsite = new Thread(OpenWebsite);
                 threadOpenWebsite.Start();
             }
             catch (Exception ex)
@@ -3056,7 +3049,7 @@ namespace ChatClient
         {
             try
             {
-                System.Diagnostics.Process.Start(mstrUrl);
+                Process.Start(mstrUrl);
             }
             catch (Exception ex)
             {
@@ -3064,7 +3057,7 @@ namespace ChatClient
             }
         }
 
-        private void menuItemAutoConnect_Click(object sender, System.EventArgs e)
+        private void menuItemAutoConnect_Click(object sender, EventArgs e)
         {
             if (menuItemAutoConnect.Checked)
             {
@@ -3081,52 +3074,52 @@ namespace ChatClient
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Configuration Command Reference\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- (where /command [optional parameters])\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Example: /autoscroll on\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!-\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /autoconnect [on,off] :: Auto Connect\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /autoscroll [on,off] :: Auto Scroll\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /channel [channel name] :: Sets the channel name\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /port [port number] :: Sets the server's port number\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /server [server address] :: Sets the server's address\n");
             }
@@ -3141,22 +3134,22 @@ namespace ChatClient
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Enter /admin for Advanced Chat Command Reference (Administration)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Enter /basic for Basic Chat Command Reference\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Enter /config for Configuration Command Reference\n");
             }
@@ -3171,102 +3164,102 @@ namespace ChatClient
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Advanced Chat Command Reference (Administration)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- (where /command [optional parameters])\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Example: /op gavin\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- \n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /ban [someone's nickname] :: Sets a ban on someone (use /unban to remove it)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /dehalfop [someone's nickname] :: Takes away someone's half-operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /deop [someone's nickname] :: Takes away someone's operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /deown [someone's nickname] :: Takes away someone's owner status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /devoice [someone's nickname] :: Takes away someone's voice status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /halfop [someone's nickname] :: Gives someone half-operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /ignore [someone's nickname] :: Ignores the person (any messages from them are ignored)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /kick [someone's nickname] :: Kicks someone out of the chat room\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /op [someone's nickname] :: Gives someone operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /own [someone's nickname] :: Gives someone owner status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /protect [someone's nickname] :: Gives someone protected status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /topic [new topic] :: Changes the chat room's topic\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /voice [someone's nickname] :: Gives someone voice status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /unban [someone's nickname] :: Removes the ban on someone\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /unprotect [someone's nickname] :: Takes away someone's protected status\n");
             }
@@ -3281,77 +3274,77 @@ namespace ChatClient
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Basic Chat Command Reference\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- (where /command [optional parameters])\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Example: /whois gavin\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!-\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /clear :: Clears the text of the active chat window\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /close :: Closes the active private chat window\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /connect :: Connects to the server and joins the chat room\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /disconnect :: Terminates your connection to the server\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /me [an action] :: Performs an action\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /msg [someone's nickname] :: Starts a private chat with someone\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /nick [your new nickname] :: Changes your nickname\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /quit [your quit message] :: Quits " + Application.Name + "\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /topic :: Shows the chat room's topic\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString().ToString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /whois [someone's nickname] :: Show's the person's hostname\n");
             }
