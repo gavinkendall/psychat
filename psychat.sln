@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "psychat", "psychat.csproj",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PsyTextBox", "PsyTextBox\PsyTextBox.csproj", "{BE75E276-9441-46F2-A3BE-667509874292}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "PsyChatSetup", "PsyChatSetup\PsyChatSetup.vdproj", "{214D6FE6-2D61-4075-AA1B-E21F3A758545}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{BE75E276-9441-46F2-A3BE-667509874292}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BE75E276-9441-46F2-A3BE-667509874292}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BE75E276-9441-46F2-A3BE-667509874292}.Release|Any CPU.Build.0 = Release|Any CPU
+		{214D6FE6-2D61-4075-AA1B-E21F3A758545}.Debug|Any CPU.ActiveCfg = Debug
+		{214D6FE6-2D61-4075-AA1B-E21F3A758545}.Debug|Any CPU.Build.0 = Debug
+		{214D6FE6-2D61-4075-AA1B-E21F3A758545}.Release|Any CPU.ActiveCfg = Release
+		{214D6FE6-2D61-4075-AA1B-E21F3A758545}.Release|Any CPU.Build.0 = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

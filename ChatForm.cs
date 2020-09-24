@@ -291,7 +291,7 @@ namespace psychat
             this.exRichTextBoxChatOutput.TabIndex = 4;
             this.exRichTextBoxChatOutput.Text = "";
             this.exRichTextBoxChatOutput.TextColor = Khendys.Controls.RtfColor.Black;
-            this.exRichTextBoxChatOutput.LinkClicked += new LinkClickedEventHandler(this.exRichTextBoxChatOutput_LinkClicked);
+            this.exRichTextBoxChatOutput.LinkClicked += new System.Windows.Forms.LinkClickedEventHandler(this.exRichTextBoxChatOutput_LinkClicked);
             // 
             // panelUserList
             // 
@@ -440,6 +440,7 @@ namespace psychat
             this.panelChatTabs.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.timerAutoScroll)).EndInit();
             this.ResumeLayout(false);
+
         }
         #endregion
 
