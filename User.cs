@@ -72,7 +72,7 @@ namespace psychat
 
             using (var sw = new StreamWriter("error.txt", true))
             {
-                sw.WriteLine(message);
+                sw.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "] " + message);
                 sw.Flush();
                 sw.Close();
             }

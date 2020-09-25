@@ -1,12 +1,18 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.1022
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "psychat", "psychat.csproj", "{8CC07F9C-8D6B-4002-84A2-1146C4458940}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PsyTextBox", "PsyTextBox\PsyTextBox.csproj", "{BE75E276-9441-46F2-A3BE-667509874292}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "PsyChatSetup", "PsyChatSetup\PsyChatSetup.vdproj", "{214D6FE6-2D61-4075-AA1B-E21F3A758545}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{78027DF0-D6A3-4D13-AD9D-88724FF0EA91}"
+	ProjectSection(SolutionItems) = preProject
+		license.txt = license.txt
+		readme.txt = readme.txt
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

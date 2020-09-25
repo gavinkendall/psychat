@@ -27,6 +27,8 @@ namespace psychat
 
         private delegate void RichTextBoxUpdate_Delegate(string target, string type, string text);
         private delegate void UpdateUserList_Delegate(bool clear);
+        private delegate void AddUserToUserList_Delegate(string nickname);
+        private delegate void RemoveUserFromUserList_Delegate(string nickname);
         private delegate void ScrollChatWindow_Delegate();
         private delegate void OnTopic_Delegate(string str1, string str2, Data ircdata);
         private delegate void Exit_Delegate();
@@ -44,7 +46,6 @@ namespace psychat
         private delegate void OnQueryMessage_Delegate(Data ircdata);
         private OnQueryMessage_Delegate onQueryMessageDelegate;
 
-        private bool allowInput;
         private TabControl tabControlChatTabs;
         private TabPage tabPageChatOutput;
         private Panel panelUserList;
@@ -63,7 +64,6 @@ namespace psychat
         private Thread threadIrcConnection;
         private ExRichTextBox textBoxChatWindow;
 
-        private System.Timers.Timer timerAutoScroll;
         private ExRichTextBox exRichTextBoxChatOutput;
         private IContainer components;
 
@@ -76,7 +76,7 @@ namespace psychat
         private MenuItem menuItemOptions;
         private MenuItem menuItemAutoConnect;
         private MenuItem menuItemAutoScroll;
-
+        private System.Windows.Forms.Timer timerUpdateUserList;
         private const int EM_LINESCROLL = 0x00B6;
 
         [DllImport("user32.dll")]
@@ -163,7 +163,7 @@ namespace psychat
                 tabPageChatOutput.Text = User.Channel;
                 textBoxChatInput.Focus();
 
-                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Username + "]";
+                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Channel + ", " + User.Username + "]";
                 panelUserList.BackColor = SystemColors.Control;
 
                 exRichTextBoxChatOutput.BackColor = User.Background;
@@ -230,7 +230,6 @@ namespace psychat
             this.panelChatInput = new System.Windows.Forms.Panel();
             this.textBoxChatInput = new PsyTextBox.PsyTextBox();
             this.panelChatTabs = new System.Windows.Forms.Panel();
-            this.timerAutoScroll = new System.Timers.Timer();
             this.menuItemConnect = new System.Windows.Forms.MenuItem();
             this.menuItemDisconnect = new System.Windows.Forms.MenuItem();
             this.menuItemSeperator = new System.Windows.Forms.MenuItem();
@@ -240,12 +239,12 @@ namespace psychat
             this.menuItemAutoScroll = new System.Windows.Forms.MenuItem();
             this.menuItemOptions = new System.Windows.Forms.MenuItem();
             this.mainMenu = new System.Windows.Forms.MainMenu(this.components);
+            this.timerUpdateUserList = new System.Windows.Forms.Timer(this.components);
             this.tabControlChatTabs.SuspendLayout();
             this.tabPageChatOutput.SuspendLayout();
             this.panelUserList.SuspendLayout();
             this.panelChatInput.SuspendLayout();
             this.panelChatTabs.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.timerAutoScroll)).BeginInit();
             this.SuspendLayout();
             // 
             // tabControlChatTabs
@@ -350,12 +349,6 @@ namespace psychat
             this.panelChatTabs.Size = new System.Drawing.Size(611, 341);
             this.panelChatTabs.TabIndex = 4444;
             // 
-            // timerAutoScroll
-            // 
-            this.timerAutoScroll.Enabled = true;
-            this.timerAutoScroll.Interval = 1000D;
-            this.timerAutoScroll.SynchronizingObject = this;
-            // 
             // menuItemConnect
             // 
             this.menuItemConnect.Index = 0;
@@ -417,6 +410,12 @@ namespace psychat
             this.menuItemFile,
             this.menuItemOptions});
             // 
+            // timerUpdateUserList
+            // 
+            this.timerUpdateUserList.Enabled = true;
+            this.timerUpdateUserList.Interval = 5000;
+            this.timerUpdateUserList.Tick += new System.EventHandler(this.timerUpdateUserList_Tick);
+            // 
             // ChatForm
             // 
             this.AutoScaleBaseSize = new System.Drawing.Size(5, 13);
@@ -438,10 +437,10 @@ namespace psychat
             this.panelChatInput.ResumeLayout(false);
             this.panelChatInput.PerformLayout();
             this.panelChatTabs.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.timerAutoScroll)).EndInit();
             this.ResumeLayout(false);
 
         }
+
         #endregion
 
         private string Nickname(string nickname)
@@ -451,6 +450,11 @@ namespace psychat
                 if (!string.IsNullOrEmpty(nickname))
                 {
                     ChannelUser user = irc.GetChannelUser(User.Channel, nickname);
+
+                    if (user == null)
+                    {
+                        return null;
+                    }
 
                     if (user.IsOp)
                     {
@@ -517,7 +521,14 @@ namespace psychat
             {
                 if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, ircdata.Nick).Host))
                 {
-                    if (listBoxUserList.Items.Contains(Nickname(ircdata.Nick)))
+                    string user = Nickname(ircdata.Nick);
+
+                    if (user == null)
+                    {
+                        return;
+                    }
+
+                    if (listBoxUserList.Items.Contains(user))
                     {
                         tab = new TabPage(ircdata.Nick);
 
@@ -544,7 +555,7 @@ namespace psychat
 
                             string nickname = ircdata.Nick;
                             AppendText(tab.Text, "tag", "[");
-                            AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
+                            AppendText(tab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                             AppendText(tab.Text, "tag", "] ");
                             AppendText(tab.Text, "notice", " -!- " + nickname + " is " +
                                 irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
@@ -565,7 +576,7 @@ namespace psychat
                                 {
                                     tab = tabControlChatTabs.TabPages[i];
                                     AppendText(tab.Text, "tag", "[");
-                                    AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(tab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(tab.Text, "tag", "] ");
                                     AppendText(tab.Text, "action", "* " + ircdata.Nick + " ");
                                     AppendText(tab.Text, "action", text);
@@ -583,7 +594,7 @@ namespace psychat
                                 if (tab.Controls[i].GetType().Name == "ExRichTextBox")
                                 {
                                     AppendText(tab.Controls[i].Text, "tag", "[");
-                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(tab.Controls[i].Text, "tag", "] ");
                                     AppendText(tab.Controls[i].Text, "action", "* " + ircdata.Nick + " ");
                                     AppendText(tab.Text, "action", text);
@@ -609,7 +620,14 @@ namespace psychat
             {
                 if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, ircdata.Nick).Host))
                 {
-                    if (listBoxUserList.Items.Contains(Nickname(ircdata.Nick)))
+                    string user = Nickname(ircdata.Nick);
+
+                    if (user == null)
+                    {
+                        return;
+                    }
+
+                    if (listBoxUserList.Items.Contains(user))
                     {
                         tab = new TabPage(ircdata.Nick);
 
@@ -635,7 +653,7 @@ namespace psychat
 
                             string nickname = ircdata.Nick;
                             AppendText(tab.Text, "tag", "[");
-                            AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
+                            AppendText(tab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                             AppendText(tab.Text, "tag", "] ");
                             AppendText(tab.Text, "notice", " -!- " + nickname + " is " +
                                 irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
@@ -654,36 +672,28 @@ namespace psychat
                             {
                                 if (tabControlChatTabs.TabPages[i].Text.Equals(ircdata.Nick))
                                 {
+                                    string person = Nickname(ircdata.Nick);
+
+                                    if (person == null)
+                                    {
+                                        return;
+                                    }
+
                                     tab = tabControlChatTabs.TabPages[i];
                                     AppendText(tab.Text, "tag", "[");
-                                    AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(tab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(tab.Text, "tag", "] <");
-                                    AppendText(tab.Text, "person", Nickname(ircdata.Nick));
+                                    AppendText(tab.Text, "person", person);
                                     AppendText(tab.Text, "tag", "> ");
                                     AppendText(tab.Text, "person", ircdata.Message);
                                     AppendText(tab.Text, "text", "\n");
-                                    User.Log(tab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
+                                    User.Log(tab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
 
                                     alPrivMsgAlert.Add(i);
                                 }
                             }
 
                             tabControlChatTabs.Refresh();
-
-                            for (int i = 0; i < tab.Controls.Count; i++)
-                            {
-                                if (tab.Controls[i].GetType().Name == "ExRichTextBox")
-                                {
-                                    AppendText(tab.Controls[i].Text, "tag", "[");
-                                    AppendText(tab.Controls[i].Text, "time", DateTime.Now.ToShortTimeString());
-                                    AppendText(tab.Controls[i].Text, "tag", "] <");
-                                    AppendText(tab.Controls[i].Text, "person", ircdata.Nick);
-                                    AppendText(tab.Controls[i].Text, "tag", "> ");
-                                    AppendText(tab.Controls[i].Text, "person", ircdata.Message);
-                                    AppendText(tab.Controls[i].Text, "text", "\n");
-                                    User.Log(tab.Controls[i].Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
-                                }
-                            }
                         }
 
                         ShowChatWindow();
@@ -703,7 +713,7 @@ namespace psychat
                 if (str3 != null)
                 {
                     AppendText(User.Channel, "tag", "[");
-                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(User.Channel, "tag", "] ");
                     AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + " (" + str3 + ")" + "\n");
                     User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + " (" + str3 + ")" + "\n");
@@ -711,7 +721,7 @@ namespace psychat
                 else
                 {
                     AppendText(User.Channel, "tag", "[");
-                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(User.Channel, "tag", "] ");
                     AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + "\n");
                     User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has left " + str1 + "\n");
@@ -745,7 +755,7 @@ namespace psychat
                 if (str2 != null)
                 {
                     AppendText(User.Channel, "tag", "[");
-                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(User.Channel, "tag", "] ");
                     AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit" + " (" + str2 + ")" + "\n");
                     User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit" + " (" + str2 + ")" + "\n");
@@ -753,7 +763,7 @@ namespace psychat
                 else
                 {
                     AppendText(User.Channel, "tag", "[");
-                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(User.Channel, "tag", "] ");
                     AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit\n");
                     User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has quit\n");
@@ -787,7 +797,7 @@ namespace psychat
                 if (!ircdata.Nick.Equals(irc.Nickname))
                 {
                     AppendText(User.Channel, "tag", "[");
-                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(User.Channel, "tag", "] ");
                     AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
                     User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + ircdata.Nick + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
@@ -810,12 +820,11 @@ namespace psychat
                     }
 
                     AppendText(User.Channel, "tag", "[");
-                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(User.Channel, "tag", "] ");
                     AppendText(User.Channel, "notice", " -!- " + irc.Nickname + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
 
                     User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + " -!- " + irc.Nickname + " [" + ircdata.Ident + "@" + ircdata.Host + "] has joined " + str1 + "\n");
-                    allowInput = true;
                 }
 
                 if (!ircdata.Nick.Equals(irc.Nickname))
@@ -844,7 +853,7 @@ namespace psychat
                         if (tabControlChatTabs.TabPages[i].Text.Equals(User.Channel))
                         {
                             AppendText(User.Channel, "tag", "[");
-                            AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                            AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                             AppendText(User.Channel, "tag", "] ");
                             AppendText(User.Channel, "action", "* " + ircdata.Nick + " ");
                             AppendText(User.Channel, "action", text);
@@ -869,10 +878,8 @@ namespace psychat
         {
             try
             {
-                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + irc.GetChannel(User.Channel).Topic;
-
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + str1 + " is now known as " + str2 + "\n");
 
@@ -907,55 +914,62 @@ namespace psychat
         {
             try
             {
-                Channel chan = irc.GetChannel(User.Channel);
-                IDictionaryEnumerator it = chan.Users.GetEnumerator();
-
-                while (it.MoveNext())
+                if (listBoxUserList.InvokeRequired)
                 {
-                    ChannelUser chanUser = (ChannelUser)it.Value;
+                    listBoxUserList.Invoke(new AddUserToUserList_Delegate(AddUserToUserList), nickname);
+                }
+                else
+                {
+                    Channel chan = irc.GetChannel(User.Channel);
+                    IDictionaryEnumerator it = chan.Users.GetEnumerator();
 
-                    if (chanUser.Nick.Equals(nickname))
+                    while (it.MoveNext())
                     {
-                        if (chanUser.IsOwner)
+                        ChannelUser chanUser = (ChannelUser)it.Value;
+
+                        if (chanUser.Nick.Equals(nickname))
                         {
-                            if (!listBoxUserList.Items.Contains("~" + chanUser.Nick))
+                            if (chanUser.IsOwner)
                             {
-                                listBoxUserList.Items.Add("~" + chanUser.Nick);
+                                if (!listBoxUserList.Items.Contains("~" + chanUser.Nick))
+                                {
+                                    listBoxUserList.Items.Add("~" + chanUser.Nick);
+                                }
                             }
-                        }
-                        else if (chanUser.IsOp)
-                        {
-                            if (!listBoxUserList.Items.Contains("@" + chanUser.Nick))
+                            else if (chanUser.IsOp)
                             {
-                                listBoxUserList.Items.Add("@" + chanUser.Nick);
+                                if (!listBoxUserList.Items.Contains("@" + chanUser.Nick))
+                                {
+                                    listBoxUserList.Items.Add("@" + chanUser.Nick);
+                                }
                             }
-                        }
-                        else if (chanUser.IsHalfOp)
-                        {
-                            if (!listBoxUserList.Items.Contains("%" + chanUser.Nick))
+                            else if (chanUser.IsHalfOp)
                             {
-                                listBoxUserList.Items.Add("%" + chanUser.Nick);
+                                if (!listBoxUserList.Items.Contains("%" + chanUser.Nick))
+                                {
+                                    listBoxUserList.Items.Add("%" + chanUser.Nick);
+                                }
                             }
-                        }
-                        else if (chanUser.IsVoice)
-                        {
-                            if (!listBoxUserList.Items.Contains("+" + chanUser.Nick))
+                            else if (chanUser.IsVoice)
                             {
-                                listBoxUserList.Items.Add("+" + chanUser.Nick);
+                                if (!listBoxUserList.Items.Contains("+" + chanUser.Nick))
+                                {
+                                    listBoxUserList.Items.Add("+" + chanUser.Nick);
+                                }
                             }
-                        }
-                        else if (chanUser.IsProtected)
-                        {
-                            if (!listBoxUserList.Items.Contains("&" + chanUser.Nick))
+                            else if (chanUser.IsProtected)
                             {
-                                listBoxUserList.Items.Add("&" + chanUser.Nick);
+                                if (!listBoxUserList.Items.Contains("&" + chanUser.Nick))
+                                {
+                                    listBoxUserList.Items.Add("&" + chanUser.Nick);
+                                }
                             }
-                        }
-                        else if (!chanUser.IsOp && !chanUser.IsVoice && !chanUser.IsHalfOp && !chanUser.IsOwner && !chanUser.IsProtected)
-                        {
-                            if (!listBoxUserList.Items.Contains(chanUser.Nick))
+                            else if (!chanUser.IsOp && !chanUser.IsVoice && !chanUser.IsHalfOp && !chanUser.IsOwner && !chanUser.IsProtected)
                             {
-                                listBoxUserList.Items.Add(chanUser.Nick);
+                                if (!listBoxUserList.Items.Contains(chanUser.Nick))
+                                {
+                                    listBoxUserList.Items.Add(chanUser.Nick);
+                                }
                             }
                         }
                     }
@@ -971,34 +985,41 @@ namespace psychat
         {
             try
             {
-                if (listBoxUserList.Items.Contains("~" + nickname))
+                if (listBoxUserList.InvokeRequired)
                 {
-                    listBoxUserList.Items.Remove("~" + nickname);
+                    listBoxUserList.Invoke(new RemoveUserFromUserList_Delegate(RemoveUserFromUserList), nickname);
                 }
-
-                if (listBoxUserList.Items.Contains("@" + nickname))
+                else
                 {
-                    listBoxUserList.Items.Remove("@" + nickname);
-                }
+                    if (listBoxUserList.Items.Contains("~" + nickname))
+                    {
+                        listBoxUserList.Items.Remove("~" + nickname);
+                    }
 
-                if (listBoxUserList.Items.Contains("%" + nickname))
-                {
-                    listBoxUserList.Items.Remove("%" + nickname);
-                }
+                    if (listBoxUserList.Items.Contains("@" + nickname))
+                    {
+                        listBoxUserList.Items.Remove("@" + nickname);
+                    }
 
-                if (listBoxUserList.Items.Contains("+" + nickname))
-                {
-                    listBoxUserList.Items.Remove("+" + nickname);
-                }
+                    if (listBoxUserList.Items.Contains("%" + nickname))
+                    {
+                        listBoxUserList.Items.Remove("%" + nickname);
+                    }
 
-                if (listBoxUserList.Items.Contains("&" + nickname))
-                {
-                    listBoxUserList.Items.Remove("&" + nickname);
-                }
+                    if (listBoxUserList.Items.Contains("+" + nickname))
+                    {
+                        listBoxUserList.Items.Remove("+" + nickname);
+                    }
 
-                if (listBoxUserList.Items.Contains(nickname))
-                {
-                    listBoxUserList.Items.Remove(nickname);
+                    if (listBoxUserList.Items.Contains("&" + nickname))
+                    {
+                        listBoxUserList.Items.Remove("&" + nickname);
+                    }
+
+                    if (listBoxUserList.Items.Contains(nickname))
+                    {
+                        listBoxUserList.Items.Remove(nickname);
+                    }
                 }
             }
             catch (Exception ex)
@@ -1017,6 +1038,31 @@ namespace psychat
                 }
                 else
                 {
+                    if (irc == null)
+                    {
+                        return;
+                    }
+
+                    if (irc.Connected)
+                    {
+                        Channel channel = irc.GetChannel(User.Channel);
+
+                        if (channel == null)
+                        {
+                            return;
+                        }
+
+                        Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Channel + ", " + irc.Nickname + "] - " + channel.Topic;
+                    }
+                    else
+                    {
+                        Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Channel + ", " + User.Username + "] - *** DISCONNECTED ***";
+
+                        listBoxUserList.Items.Clear();
+
+                        return;
+                    }
+
                     if (clear)
                     {
                         listBoxUserList.Items.Clear();
@@ -1088,13 +1134,13 @@ namespace psychat
         {
             try
             {
-                if (!allowInput)
+                if (irc != null && !irc.Connected)
                 {
                     AppendText(User.Channel, "notice", data + "\n");
 
                     if (data.EndsWith("WARN SOCKET  - connection lost"))
                     {
-                        AppendText(User.Channel, "notice", " -!- You've lost your connection to the chat server." + "\n");
+                        AppendText(User.Channel, "notice", " -!- You've lost your connection to the IRC server." + "\n");
                     }
 
                     if (data.EndsWith("Checking ident...") ||
@@ -1104,8 +1150,6 @@ namespace psychat
                         AppendText(User.Channel, "notice", " -!- You're still connecting. Be patient." + "\n");
                     }
                 }
-
-                UpdateUserList(false);
             }
             catch (Exception ex)
             {
@@ -1129,15 +1173,22 @@ namespace psychat
                         {
                             if (tabControlChatTabs.TabPages[i].Text.Equals(User.Channel))
                             {
+                                string person = Nickname(ircdata.Nick);
+
+                                if (person == null)
+                                {
+                                    return;
+                                }
+
                                 AppendText(User.Channel, "tag", "[");
-                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                                 AppendText(User.Channel, "tag", "] <");
-                                AppendText(User.Channel, "person", Nickname(ircdata.Nick));
+                                AppendText(User.Channel, "person", person);
                                 AppendText(User.Channel, "tag", "> ");
                                 AppendText(User.Channel, "text", ircdata.Message);
                                 AppendText(User.Channel, "text", "\n");
 
-                                User.Log(User.Channel, "[" + DateTime.Now.ToShortTimeString() + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
+                                User.Log(User.Channel, "[" + DateTime.Now.ToString("HH:mm:ss") + "] <" + ircdata.Nick + "> " + ircdata.Message + "\n");
 
                                 alPrivMsgAlert.Add(i);
 
@@ -1162,7 +1213,7 @@ namespace psychat
                 if (ircdata.Nick != null)
                 {
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                     AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- " + ircdata.Nick + " - " + ircdata.Message + "\n");
 
@@ -1185,7 +1236,7 @@ namespace psychat
                 }
                 else
                 {
-                    Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + irc.GetChannel(User.Channel).Topic;
+                    // Something here to say that the topic has been changed?
                 }
             }
             catch (Exception ex)
@@ -1211,7 +1262,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken operator status from " + str3 + " on " + str1 + "\n");
 
@@ -1229,7 +1280,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given owner status to " + str3 + " on " + str1 + "\n");
 
@@ -1247,7 +1298,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given halfop status to " + str3 + " on " + str1 + "\n");
 
@@ -1265,7 +1316,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given protect status to " + str3 + " on " + str1 + "\n");
 
@@ -1283,7 +1334,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken owner status from " + str3 + " on " + str1 + "\n");
 
@@ -1301,7 +1352,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken halfop status from " + str3 + " on " + str1 + "\n");
 
@@ -1319,7 +1370,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken protect status from " + str3 + " on " + str1 + "\n");
 
@@ -1352,7 +1403,7 @@ namespace psychat
                 }
 
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given operator status to " + str3 + " on " + str1 + "\n");
 
@@ -1370,7 +1421,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has taken voice status from " + str3 + " on " + str1 + "\n");
 
@@ -1403,7 +1454,7 @@ namespace psychat
                 }
 
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has given voice status to " + str3 + " on " + str1 + "\n");
 
@@ -1437,7 +1488,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has unbanned " + str3 + "\n");
 
@@ -1454,7 +1505,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + ircdata.Nick + " has banned " + str3 + "\n");
 
@@ -1471,7 +1522,7 @@ namespace psychat
             try
             {
                 AppendText(User.Channel, "tag", "[");
-                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(User.Channel, "tag", "] ");
                 AppendText(User.Channel, "notice", " -!- " + str2 + " was kicked from " + str1 + " by " + ircdata.Nick + " (" + str4 + ")" + "\n");
 
@@ -1533,7 +1584,7 @@ namespace psychat
         {
             try
             {
-                if (allowInput)
+                if (irc != null && irc.Connected)
                 {
                     if (e.KeyChar == (char)27)
                     {
@@ -1553,11 +1604,6 @@ namespace psychat
 
                     if (e.KeyChar == (char)13)
                     {
-                        if (User.Extra != null)
-                        {
-                            Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + User.Extra;
-                        }
-
                         if (textBoxChatInput.Text.Length > 0)
                         {
                             if (textBoxChatInput.Text.StartsWith("/"))
@@ -1625,7 +1671,7 @@ namespace psychat
                                         {
                                             menuItemAutoConnect.Checked = true;
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned on\n");
                                         }
@@ -1634,7 +1680,7 @@ namespace psychat
                                         {
                                             menuItemAutoConnect.Checked = false;
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned off\n");
                                         }
@@ -1647,12 +1693,11 @@ namespace psychat
                                         if (message.Equals("on"))
                                         {
                                             menuItemAutoScroll.Checked = true;
-                                            timerAutoScroll.Enabled = true;
 
                                             ScrollChatWindow();
 
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned on\n");
                                         }
@@ -1660,10 +1705,9 @@ namespace psychat
                                         if (message.Equals("off"))
                                         {
                                             menuItemAutoScroll.Checked = false;
-                                            timerAutoScroll.Enabled = false;
 
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned off\n");
                                         }
@@ -1739,7 +1783,14 @@ namespace psychat
                                                 split[0] = split[0].ToLower();
                                             }
 
-                                            if (listBoxUserList.Items.Contains(split[0]) || split[0].Equals("nickserv"))
+                                            string person = Nickname(irc.Nickname);
+
+                                            if (person == null)
+                                            {
+                                                return;
+                                            }
+
+                                            if (listBoxUserList.Items.Contains(person) || split[0].Equals("nickserv"))
                                             {
                                                 textBoxChatWindow = new ExRichTextBox();
 
@@ -1773,24 +1824,17 @@ namespace psychat
 
                                                     if (comment != null && comment.Length > 0)
                                                     {
-                                                        if (split[0].Equals("nickserv"))
-                                                        {
-                                                            irc.Message(SendType.Message, split[0], comment);
-                                                        }
-                                                        else
-                                                        {
-                                                            irc.Message(SendType.Message, split[0], comment);
-                                                        }
+                                                        irc.Message(SendType.Message, split[0], comment);
 
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
+                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToString("HH:mm:ss"));
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] <");
-                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname));
+                                                        AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", person);
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", comment);
                                                         AppendText(tabControlChatTabs.SelectedTab.Text, "text", "\n");
 
-                                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + Nickname(irc.Nickname) + "> " + comment + "\n");
+                                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] <" + person + "> " + comment + "\n");
                                                     }
                                                 }
                                                 else
@@ -1811,24 +1855,17 @@ namespace psychat
 
                                                             if (comment != null && comment.Length > 0)
                                                             {
-                                                                if (split[0].Equals("nickserv"))
-                                                                {
-                                                                    irc.Message(SendType.Message, split[0], comment);
-                                                                }
-                                                                else
-                                                                {
-                                                                    irc.Message(SendType.Message, split[0], comment);
-                                                                }
+                                                                irc.Message(SendType.Message, split[0], comment);
 
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
+                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToString("HH:mm:ss"));
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] <");
-                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname));
+                                                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", person);
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", comment);
                                                                 AppendText(tabControlChatTabs.SelectedTab.Text, "text", "\n");
 
-                                                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + Nickname(irc.Nickname) + "> " + comment + "\n");
+                                                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] <" + person + "> " + comment + "\n");
                                                                 break;
                                                             }
                                                         }
@@ -1842,10 +1879,17 @@ namespace psychat
                                     {
                                         string nickname = textBoxChatInput.Text.Substring(7);
 
-                                        if (listBoxUserList.Items.Contains(Nickname(nickname)))
+                                        string user = Nickname(nickname);
+
+                                        if (user == null)
+                                        {
+                                            return;
+                                        }
+
+                                        if (listBoxUserList.Items.Contains(user))
                                         {
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                            AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                             AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- " + nickname + " is " +
                                                 irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
@@ -1859,7 +1903,7 @@ namespace psychat
                                     if (textBoxChatInput.Text.StartsWith("/me "))
                                     {
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "action", "* " + irc.Nickname + " ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "action", textBoxChatInput.Text.Substring(4));
@@ -1867,7 +1911,7 @@ namespace psychat
 
                                         irc.Message(SendType.Action, tabControlChatTabs.SelectedTab.Text, textBoxChatInput.Text.Substring(4));
 
-                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] * " + irc.Nickname + " " + textBoxChatInput.Text.Substring(4) + "\n");
+                                        User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] * " + irc.Nickname + " " + textBoxChatInput.Text.Substring(4) + "\n");
                                     }
 
                                     if (textBoxChatInput.Text.Equals("/topic"))
@@ -1897,7 +1941,6 @@ namespace psychat
                                                 irc.Topic(User.Channel, message);
 
                                                 User.Log(User.Channel, " -!- " + irc.Nickname + " changed the topic to: " + message + "\n");
-                                                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + irc.Nickname + "] - " + message;
                                             }
                                         }
                                         else
@@ -2149,7 +2192,7 @@ namespace psychat
                                             else
                                             {
                                                 AppendText(User.Channel, "tag", "[");
-                                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                                                 AppendText(User.Channel, "tag", "] ");
                                                 AppendText(User.Channel, "notice", " -!- Ban failed. " + split[0] + " is a protected user\n");
                                             }
@@ -2184,7 +2227,7 @@ namespace psychat
                                             else
                                             {
                                                 AppendText(User.Channel, "tag", "[");
-                                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                                                 AppendText(User.Channel, "tag", "] ");
                                                 AppendText(User.Channel, "notice", " -!- Kick failed. " + split[0] + " is a protected user\n");
                                             }
@@ -2211,7 +2254,7 @@ namespace psychat
                                             else
                                             {
                                                 AppendText(User.Channel, "tag", "[");
-                                                AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                                AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                                                 AppendText(User.Channel, "tag", "] ");
                                                 AppendText(User.Channel, "notice", " -!- Kick failed. " + split[0] + " is a protected user\n");
                                             }
@@ -2222,25 +2265,35 @@ namespace psychat
                                     {
                                         string message = textBoxChatInput.Text.Substring(6);
                                         string[] split = message.Split(' ');
+
                                         User.Username = split[0];
-                                        irc.Nick(split[0]);
-                                        Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + split[0] + "] - " + irc.GetChannel(User.Channel).Topic;
+
+                                        irc.Nick(User.Username);
                                     }
                                 }
                             }
                             else
                             {
+                                string user = Nickname(irc.Nickname);
+
+                                if (user == null || irc == null || !irc.Connected)
+                                {
+                                    return;
+                                }
+
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToString("HH:mm:ss"));
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] <");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", Nickname(irc.Nickname));
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", user);
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "text", textBoxChatInput.Text + "\n");
 
                                 irc.Message(SendType.Message, tabControlChatTabs.SelectedTab.Text, textBoxChatInput.Text);
-                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToShortTimeString() + "] <" + Nickname(irc.Nickname) + "> " + textBoxChatInput.Text + "\n");
+
+                                User.Log(tabControlChatTabs.SelectedTab.Text, "[" + DateTime.Now.ToString("HH:mm:ss") + "] <" + user + "> " + textBoxChatInput.Text + "\n");
                             }
                         }
+
                         textBoxChatInput.Clear();
                     }
                 }
@@ -2248,7 +2301,7 @@ namespace psychat
                 {
                     if (e.KeyChar == (char)13)
                     {
-                        if (textBoxChatInput.Text != "")
+                        if (!string.IsNullOrEmpty(textBoxChatInput.Text))
                         {
                             if (textBoxChatInput.Text.StartsWith("/"))
                             {
@@ -2262,7 +2315,7 @@ namespace psychat
                                     key.SetValue("server", User.Server);
 
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Server address has been set to " + message + "\n");
                                 }
@@ -2279,14 +2332,14 @@ namespace psychat
                                         key.SetValue("port", User.Port);
 
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Server port has been set to " + message + "\n");
                                     }
                                     catch (FormatException)
                                     {
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Server port must be a number\n");
                                     }
@@ -2304,7 +2357,7 @@ namespace psychat
                                     tabControlChatTabs.TabPages[0].Text = User.Channel;
 
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Channel name has been set to " + message + "\n");
                                 }
@@ -2337,7 +2390,7 @@ namespace psychat
                                     {
                                         menuItemAutoConnect.Checked = true;
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned on\n");
                                     }
@@ -2346,7 +2399,7 @@ namespace psychat
                                     {
                                         menuItemAutoConnect.Checked = false;
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Connect has been turned off\n");
                                     }
@@ -2359,10 +2412,11 @@ namespace psychat
                                     if (message.Equals("on"))
                                     {
                                         menuItemAutoScroll.Checked = true;
-                                        timerAutoScroll.Enabled = true;
+
                                         ScrollChatWindow();
+
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned on\n");
                                     }
@@ -2370,9 +2424,9 @@ namespace psychat
                                     if (message.Equals("off"))
                                     {
                                         menuItemAutoScroll.Checked = false;
-                                        timerAutoScroll.Enabled = false;
+
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Auto Scroll has been turned off\n");
                                     }
@@ -2384,18 +2438,17 @@ namespace psychat
                                     string[] split = message.Split(' ');
 
                                     AppendText(User.Channel, "tag", "[");
-                                    AppendText(User.Channel, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(User.Channel, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(User.Channel, "tag", "] ");
                                     AppendText(User.Channel, "notice", " -!- " + User.Username + " is now known as " + split[0] + "\n");
 
                                     User.Username = split[0];
-                                    Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Username + "]";
                                 }
 
                                 if (textBoxChatInput.Text.StartsWith("/me "))
                                 {
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "action", "* " + User.Username + " ");
                                     AppendText(tabControlChatTabs.SelectedTab.Text, "action", textBoxChatInput.Text.Substring(4));
@@ -2431,7 +2484,7 @@ namespace psychat
                             else
                             {
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "[");
-                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToShortTimeString());
+                                AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", DateTime.Now.ToString("HH:mm:ss"));
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "] (offline) <");
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", User.Username);
                                 AppendText(tabControlChatTabs.SelectedTab.Text, "yourself", "> ");
@@ -2624,6 +2677,7 @@ namespace psychat
                 if (listBoxUserList.SelectedItem.ToString() != null)
                 {
                     string user = listBoxUserList.SelectedItem.ToString().TrimStart('@', '+', '~', '&', '%');
+
                     if (!alIgnoredHosts.Contains(irc.GetChannelUser(User.Channel, user).Host))
                     {
                         if (!user.Equals(irc.Nickname))
@@ -2660,7 +2714,7 @@ namespace psychat
                                 string nickname = user;
 
                                 AppendText(tab.Text, "tag", "[");
-                                AppendText(tab.Text, "time", DateTime.Now.ToShortTimeString());
+                                AppendText(tab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                                 AppendText(tab.Text, "tag", "] ");
                                 AppendText(tab.Text, "notice", " -!- " + nickname + " is " +
                                     irc.GetChannelUser(User.Channel, nickname).Ident + "@" +
@@ -2776,7 +2830,7 @@ namespace psychat
                     else
                     {
                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                        AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                         AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                         AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Unable to connect to " + User.Server + ":" + User.Port + "\n");
                     }
@@ -2784,7 +2838,7 @@ namespace psychat
                 else
                 {
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                    AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                     AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                     AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- A connection to " + User.Server + ":" + User.Port + " could not be established.\n");
                 }
@@ -2858,15 +2912,13 @@ namespace psychat
             {
                 irc.Disconnect();
 
-                allowInput = false;
                 menuItemConnect.Enabled = true;
                 menuItemDisconnect.Enabled = false;
 
                 AppendText(User.Channel, "notice", "-------------------------------------" + "\n");
                 AppendText(User.Channel, "notice", " -!- You have been disconnected from the IRC server.");
                 AppendText(User.Channel, "text", "\n");
-
-                Text = Application.Name + " [" + User.Server + ":" + User.Port + ", " + User.Username + "]";
+                
                 listBoxUserList.Items.Clear();
             }
             catch (Exception ex)
@@ -3021,12 +3073,11 @@ namespace psychat
             if (menuItemAutoScroll.Checked)
             {
                 menuItemAutoScroll.Checked = false;
-                timerAutoScroll.Enabled = false;
             }
             else
             {
                 menuItemAutoScroll.Checked = true;
-                timerAutoScroll.Enabled = true;
+
                 ScrollChatWindow();
             }
         }
@@ -3075,52 +3126,52 @@ namespace psychat
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Configuration Command Reference\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- (where /command [optional parameters])\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Example: /autoscroll on\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!-\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /autoconnect [on,off] :: Auto Connect\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /autoscroll [on,off] :: Auto Scroll\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /channel [channel name] :: Sets the channel name\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /port [port number] :: Sets the server's port number\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /server [server address] :: Sets the server's address\n");
             }
@@ -3135,22 +3186,22 @@ namespace psychat
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Enter /admin for Advanced Chat Command Reference (Administration)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Enter /basic for Basic Chat Command Reference\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Enter /config for Configuration Command Reference\n");
             }
@@ -3165,102 +3216,102 @@ namespace psychat
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Advanced Chat Command Reference (Administration)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- (where /command [optional parameters])\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Example: /op gavin\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- \n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /ban [someone's nickname] :: Sets a ban on someone (use /unban to remove it)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /dehalfop [someone's nickname] :: Takes away someone's half-operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /deop [someone's nickname] :: Takes away someone's operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /deown [someone's nickname] :: Takes away someone's owner status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /devoice [someone's nickname] :: Takes away someone's voice status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /halfop [someone's nickname] :: Gives someone half-operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /ignore [someone's nickname] :: Ignores the person (any messages from them are ignored)\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /kick [someone's nickname] :: Kicks someone out of the chat room\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /op [someone's nickname] :: Gives someone operator status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /own [someone's nickname] :: Gives someone owner status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /protect [someone's nickname] :: Gives someone protected status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /topic [new topic] :: Changes the chat room's topic\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /voice [someone's nickname] :: Gives someone voice status\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /unban [someone's nickname] :: Removes the ban on someone\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /unprotect [someone's nickname] :: Takes away someone's protected status\n");
             }
@@ -3275,77 +3326,77 @@ namespace psychat
             try
             {
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "\n[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- **** " + Application.Name + " Help ****\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Basic Chat Command Reference\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- (where /command [optional parameters])\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- Example: /whois gavin\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!-\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /clear :: Clears the text of the active chat window\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /close :: Closes the active private chat window\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /connect :: Connects to the server and joins the chat room\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /disconnect :: Terminates your connection to the server\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /me [an action] :: Performs an action\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /msg [someone's nickname] :: Starts a private chat with someone\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /nick [your new nickname] :: Changes your nickname\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /quit [your quit message] :: Quits " + Application.Name + "\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /topic :: Shows the chat room's topic\n");
 
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "[");
-                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToShortTimeString());
+                AppendText(tabControlChatTabs.SelectedTab.Text, "time", DateTime.Now.ToString("HH:mm:ss"));
                 AppendText(tabControlChatTabs.SelectedTab.Text, "tag", "] ");
                 AppendText(tabControlChatTabs.SelectedTab.Text, "notice", " -!- /whois [someone's nickname] :: Show's the person's hostname\n");
             }
@@ -3353,6 +3404,11 @@ namespace psychat
             {
                 User.ErrorLog(ex.ToString());
             }
+        }
+
+        private void timerUpdateUserList_Tick(object sender, EventArgs e)
+        {
+            UpdateUserList(false);
         }
     }
 }
