@@ -10,8 +10,8 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyDescription("A simple IRC client.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Gavin Kendall")]
-[assembly: AssemblyProduct("")]
-[assembly: AssemblyCopyright("")]
+[assembly: AssemblyProduct("PsyChat")]
+[assembly: AssemblyCopyright("2021 Gavin Kendall")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]		
 

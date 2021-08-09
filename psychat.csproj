@@ -10,7 +10,8 @@
     <ApplicationIcon>psychat-icon.ico</ApplicationIcon>
     <AssemblyKeyContainerName />
     <AssemblyName>psychat</AssemblyName>
-    <AssemblyOriginatorKeyFile>psychat.pfx</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
     <DefaultClientScript>JScript</DefaultClientScript>
     <DefaultHTMLPageLayout>Grid</DefaultHTMLPageLayout>
     <DefaultTargetSchema>IE50</DefaultTargetSchema>
@@ -88,7 +89,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
+    <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Khendys.Controls.ExRichTextBox">
@@ -134,8 +135,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Content Include="App.ico" />
-    <Content Include="dll\Khendys.Controls.ExRichTextBox.dll" />
-    <Content Include="dll\PsyRC.dll" />
+    <Content Include="dll\Khendys.Controls.ExRichTextBox.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="dll\PsyRC.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="psychat-icon.ico" />
     <Content Include="psychat-icon.png" />
     <EmbeddedResource Include="ChatForm.resx">
@@ -164,7 +169,6 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="app.manifest" />
-    <None Include="psychat.pfx" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
